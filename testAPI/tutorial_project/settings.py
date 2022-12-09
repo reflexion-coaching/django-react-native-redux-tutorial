@@ -63,12 +63,6 @@ MIDDLEWARE = [
 ]
 
 # new
-#CORS_ORIGIN_WHITELIST = ('http://192.168.1.20:19000', 'http://localhost:19000')
-
-#CSRF_TRUSTED_ORIGINS = [ "http://192.168.1.20:19000", 'http://localhost:19000', 'http://127.0.0.1:19000' ]  # new
-
-#CORS_ORIGIN_ALLOW_ALL = True
-#CORS_ALLOW_CREDENTIALS = True
 ALLOWED_HOSTS = ['*']
 
 ROOT_URLCONF = "tutorial_project.urls"

@@ -1,5 +1,7 @@
 # Tutoriel : Django-API, Redux-ToolKit Query et React Native
 
+**En cours !**
+
 Ce tutoriel illustre les principales interactions entre une base de données et une application.
 
 La base de données est une base SQLite simple créée et reliée à l'application via le framework Django REST. L'application est écrite avec React Native.
@@ -397,9 +399,13 @@ $ deactivate
 
 ## React Native et Redux-ToolKit 
 
+**React Native** est un framework basée sur React permettant de créer des applications IOS et Android. **Redux-ToolKit** est une librairie JavaScript de gestion de l'état d'une application web. 
+
+React Native sera utilisé pour créer l'interface de l'application tandis que Redux-ToolKit (et plus particulièrement, Redux-ToolKit Query) servira à effectuer des requêtes avec Django REST Framework et mettre les données reçues en cache. 
+
 ### Installation via Expo
 
-Commençons par créer un nouveau projet React Native avec Expo et téléchargeons la librairie Redux-ToolKit:
+Expo est une plate-forme facilitant la création d'application IOS, Android et web. Commençons donc par créer un nouveau projet React Native avec Expo et téléchargeons la librairie Redux-ToolKit:
 
 ```
 $ npx create-expo-app testReactNative
@@ -423,7 +429,9 @@ Ouverture d'Android > "Device Manager" > start a device
 
 ### Ouverture de l'application 
 
-Lançons l'application avec la commande `npm start` et choisissons **Android** (si c'est le cas). Sur notre faux téléphone ouvert par Android Studio, le message s'affiche : "Open up App.js to start working on your app!". L'application est bien connectée au faux téléphone. 
+Lançons l'application avec la commande `npm start` et choisissons **Android** (si c'est le cas). 
+
+Sur notre faux téléphone ouvert par Android Studio, l'écran affiche : "Open up App.js to start working on your app!". L'application est bien connectée au faux téléphone. 
 
 Ensuite, autorisons le "Debug Remote JS" dans le "Toggle Menu" (le menu s'affiche en tapand "m" en ligne de commande). Le debugger devrait s'ouvrir dans le navigateur avec comme URL http://localhost:19000/debugger-ui/. Le port est 19000. Fermons la page et lançons la commande :
 
@@ -455,7 +463,6 @@ $ mkdir src/features/book
 
 L'architecture basique du projet ressemble donc à :
 
-
 * /testAPI
     * manage.py
     * /tutorial_project
@@ -470,7 +477,8 @@ L'architecture basique du projet ressemble donc à :
             * /book
         * /reducers
     
-Bien maintenant commençons par éditer un nouveau fichier `src/features/api/bookSlice.js` :
+
+Le dossier `src/features/api` contient les fichiers avec le code Redux. Créons un nouveau fichier `src/features/api/bookSlice.js` et éditons-le :
 
 ```
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
@@ -489,7 +497,13 @@ export const { useGetListOfBooksQuery } = bookApi
 
 ```
 
-et ensuite, modifions le fichier `src/features/book/BookList.js` :
+**`createApi`** définit un ensemble de endpoints décrivant comment récupérer des données à partir d'un backend :
+
+* `reducerPath` le nom de l'endroit où sera monté nos données dans le store (dans notre cas, `bookApi`)
+* `baseQuery` est l'URL de base de chaque requête (i.e. `'http://10.0.2.2:8000/api/v1/'`)
+* `endpoints` est une liste d'`endpoints`. Dans notre exemple, `books/` sera ajoutée à l'URL de base pour envoyer des requêtes à `'http://10.0.2.2:8000/api/v1/books/'`. 
+
+Redux-ToolKit Query construit automatiquement des hooks utiles à l'utilisation des requêtes. Ici, la récupération des données se fera grâce à `useGetListOfBooksQuery` et sera utilisé dans le nouveau fichier `src/features/book/BookList.js` :
 
 ```
 import React from 'react';
@@ -499,7 +513,6 @@ import { useGetListOfBooksQuery } from '../api/bookSlice'
 export const BookList = () => {
 
     const { data, isLoading, isSuccess, isError, error } = useGetListOfBooksQuery()
-    //const { data, isLoading, isSuccess, isError, error } = useGetListOfBooksQuery('bulbasaur')
 
     let content
 
