@@ -441,7 +441,9 @@ open "rndebugger://set-debugger-loc?host=localhost&port=19000"
 
 RND s'ouvre et affiche l'état de notre projet dans la console :) Si cela ne fonctionne pas directement, il faut éventuellement arrêter et relancer dans le "Debug Remote JS" dans le "Toggle Menu".
 
-### Connexion avec l'API
+### Connexion avec l'API : requête GET
+
+Les requêtes GET récupèrent des données de l'API pour les afficher à l'écran. Avant de commencer à coder, modifons un peu l'architecture des dossiers.
 
 Au sein du dossier **testReactNative**, créons  deux dossiers : **src/features** et **src/reducers** :
 
@@ -532,7 +534,13 @@ export const BookList = () => {
 }
 ```
 
-Bien ! Créons le fichier `src/reducers/store.js` et éditons-le :
+Pour le moment, l'application affiche :
+
+* **Loading** pendant le téléchargement des données
+* **Query works !** si la requête GET est un succès
+* **Query doesn't work !** si la requête échoue
+
+Seulement pour que les requêtes s'effectuent, il faut éditer le *store* de Redux avec le *reducer* créé dans `src/features/api/bookSlice.js`. Editons donc le fichier `src/reducers/store.js` :
 
 ```
 import { configureStore } from '@reduxjs/toolkit';
@@ -546,8 +554,7 @@ export const store = configureStore({
     getDefaultMiddleware().concat(bookApi.middleware)
 });
 ```
-
-Et enfin, importons notre composant dans le fichier `App.js` :
+ Exellent ! Enfin, importons notre composant dans le fichier `App.js` et enveloppons notre application avec le store :
 
 ```
 import { StatusBar } from 'expo-status-bar';
@@ -578,5 +585,433 @@ const styles = StyleSheet.create({
 ```
 
 (En cas d'erreur, il est possible que la solution soit d'installer à nouveau react-redux `npm install --save react-redux`).
+
+Super ! **Query works !** s'affiche sur l'écran du téléphone émulé : la requête GET est un succès !
+
+### Connexion avec l'API : requête POST
+
+Les requêtes POST envoient des données au serveur afin de modifier la base de données. Nous allons créer un petit bouton qui enverra des requêtes POST à chaque fois que le bouton sera pressé. Les données envoyées seront les mêmes à chaque requête. Plus tard, nous ajouterons un formulaire afin de customiser les données envoyées au serveur. 
+
+Modifons le fichier `src/features/api/bookSlice.js` :
+
+```
+import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
+
+export const bookApi = createApi({
+  reducerPath: 'bookApi',
+  baseQuery: fetchBaseQuery({ baseUrl: 'http://10.0.2.2:8000/api/v1/' }), 
+  endpoints: builder => ({
+    getListOfBooks: builder.query({
+      query: () => `books/`,
+    }),
+    addNewBook: builder.mutation({
+      query: initialBook => ({
+        url: 'books/',
+        method: 'POST',
+        body: initialBook
+      })
+    })
+  }),
+})
+
+export const { useGetListOfBooksQuery, useAddNewBookMutation } = bookApi
+```
+
+Le nouveau hook `useAddNewBookMutation` est ensuite utilisé dans un nouveau fichier `src/features/book/BookPost.js` :
+
+```
+import React, { useState } from 'react';
+import { Text, View, Button, StyleSheet } from 'react-native';
+import { useAddNewBookMutation } from '../api/bookSlice'
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        padding: 22,
+        marginTop: 30,
+    },
+    item: {
+        padding: 10,
+        fontSize: 18,
+        height: 44,
+        textAlign: 'center',
+    },
+});
+
+export const BookPost = () => {
+
+    const [title, setTitle] = useState('Le Machine learning avec Python !')
+    const [authorId, setAuthorId] = useState(1)
+    const [addNewBook, { isLoading }] = useAddNewBookMutation()
+
+    const canSave = [authorId, title].every(Boolean) && !isLoading
+
+    const onSaveBookClicked = async () => {
+        if (canSave) {
+            try {
+                await addNewBook({ title, author: authorId }).unwrap()
+                setTitle('')
+                setAuthorId('')
+            } catch (err) {
+                console.error('Failed to save the post: ', err)
+            }
+        }
+    }
+
+    return (
+        <View style={styles.container}> 
+            <Button
+                onPress={onSaveBookClicked}
+                title="Make a POST Request"
+                color="#6495ed"
+                accessibilityLabel="Make a POST Request by clicking this button"
+            />
+        </View>
+    )
+}
+```
+
+Ce composant servira à afficher un bouton qui enverra le titre d'un nouveau livre (ici, "Le Machine learning avec Python !").
+
+Enfin ajoutons le nouveau bouton dans `App.js`:
+
+```
+import { StatusBar } from 'expo-status-bar';
+import { StyleSheet, View, Text } from 'react-native';
+import { BookList } from "./src/features/book/BookList"
+import { BookPost } from './src/features/book/BookPost';
+
+import { Provider } from 'react-redux';
+import { store } from './src/reducers/store';
+
+export default function App() {
+  return (
+    <Provider store={store}>
+      <View style={styles.container}>
+        <BookList />
+        <BookPost />
+        <StatusBar style="auto" />
+      </View>
+    </Provider>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});
+```
+
+Et voilà :) A chaque fois que le bouton sera pressé, une nouvelle requête POST sera envoyée avec comme auteur "1" qui est l'identifiant de l'administrateur et comme titre "Le Machine learning avec Python !". La liste est toujours disponible à l'adresse http://127.0.0.1:8000/api/v1/books/. 
+
+### Mettre à jour les données en cache
+
+Améliorons `src/features/book/BookList.js` afin d'afficher la liste des livres :
+
+```
+import React from 'react';
+import { Text, View, Image, StyleSheet, FlatList } from 'react-native';
+import { useGetListOfBooksQuery } from '../api/bookSlice'
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        padding: 22,
+        marginTop: 30,
+    },
+    item: {
+        padding: 10,
+        fontSize: 18,
+        height: 44,
+        textAlign: 'center',
+    },
+});
+
+export const BookList = () => {
+
+    const { data, isLoading, isSuccess, isError, error } = useGetListOfBooksQuery()
+
+    let content
+
+    if (isLoading) {
+        content = <Text> Loading ... </Text>
+    } else if (isSuccess) {
+        content = <FlatList data={data} renderItem={({ item }) => <Text style={styles.item}>Titre {item.id} : {item.title}</Text>} />
+    } else if (isError) {
+        content = <Text> Query doesn't work !</Text>
+    }
+
+    return (
+        <View style={styles.container}>
+            {content}
+        </View>
+    )
+}
+```
+
+La liste des livres s'affichent désormais sur l'écran. Par-contre, elle ne se met pas à jour à chaque fois que le bouton de la requête POST est pressé. Mettons en place cette amélioration en ajoutant `tagTypes: ['Book']` à `src/features/api/bookSlice.js` :
+
+```
+import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
+
+export const bookApi = createApi({
+  reducerPath: 'bookApi',
+  baseQuery: fetchBaseQuery({ baseUrl: 'http://10.0.2.2:8000/api/v1/' }), 
+  tagTypes: ['Book'], //new
+  endpoints: builder => ({
+    getListOfBooks: builder.query({
+      query: () => `books/`,
+      providesTags: ['Book'] //new
+    }),
+    addNewBook: builder.mutation({
+      query: initialBook => ({
+        url: 'books/',
+        method: 'POST',
+        body: initialBook
+      }),
+      invalidatesTags: ['Book'] //new
+    })
+  })
+})
+
+export const { useGetListOfBooksQuery, useAddNewBookMutation } = bookApi
+```
+
+Les **tags** sont très utiles pour synchroniser la base de données avec l'application. 
+
+### Connexion avec l'API : requête DELETE
+
+Pour le moment, nous avons intégré des requêtes GET et POST. La requête suivant est DELETE. Le slice Redux devient :
+
+```
+import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
+
+export const bookApi = createApi({
+  reducerPath: 'bookApi',
+  baseQuery: fetchBaseQuery({ baseUrl: 'http://10.0.2.2:8000/api/v1/' }), 
+  tagTypes: ['Book'], 
+  endpoints: builder => ({
+    getListOfBooks: builder.query({
+      query: () => `books/`,
+      providesTags: ['Book'] 
+    }),
+    addNewBook: builder.mutation({
+      query: initialBook => ({
+        url: 'books/',
+        method: 'POST',
+        body: initialBook
+      }),
+      invalidatesTags: ['Book'] 
+    }),
+    deleteBook: builder.mutation({
+      query: (id) => ({
+        url: `/books/${id}/`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['Book'],
+    }),
+  })
+})
+
+export const { useGetListOfBooksQuery, useAddNewBookMutation, useDeleteBookMutation } = bookApi
+```
+
+Le hook `useDeleteBookMutation` sert à supprimer un livre de la base de données et le tag `invalidatesTags: ['Book']` met à nouveau à jour la liste des livres en cas de suppression d'une entrée. 
+
+Ajoutons le bouton de suppression en-dessous de chaque titre de livre :
+
+```
+import React from 'react';
+import { Text, View, Button, StyleSheet, FlatList } from 'react-native';
+import { useGetListOfBooksQuery, useDeleteBookMutation } from '../api/bookSlice'
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        padding: 22,
+        marginTop: 30,
+    },
+    item: {
+        padding: 10,
+        marginTop: 30,
+        fontSize: 18,
+        height: 44,
+        textAlign: 'center',
+    },
+});
+
+export const BookList = () => {
+
+    const { data, isLoading, isSuccess, isError, error } = useGetListOfBooksQuery()
+    const [deleteBook, response] = useDeleteBookMutation()
+
+    let content
+
+    if (isLoading) {
+        content = <Text> Loading ... </Text>
+    } else if (isSuccess) {
+        content = <FlatList data={data} renderItem={({ item }) => <View>
+            <Text style={styles.item}>Titre {item.id} : {item.title}</Text>
+            <Button onPress={() => deleteBook(item.id)} title="Delete Book" color="#6495ed"/> //new
+        </View>} />
+    } else if (isError) {
+        content = <Text> Query doesn't work !</Text>
+    }
+
+    return (
+        <View style={styles.container}>
+            {content}
+        </View>
+    )
+}
+```
+
+Excellent !
+
+### Création de formulaire : Formik
+
+Pour le moment, la requête POST ajoute systématiquement le même livre dans la base de données ( *Le Machine learning avec Python* avec comme auteur *admin*). Il serait intéressant de pouvoir rentrer un titre et le nom de l'auteur avant de soumettre la requête POST. La librairie Formik (https://formik.org/) est la librairie la plus utilisée pour la création de formulaire avec React Native. Téléchargeons-la :
+
+```
+$ npm install formik
+```
+
+En plus de formik, installons la librairie Yup qui servira à valider les données rentrées par l'utilisateur :
+
+```
+$ npm install yup
+```
+
+Bien, maintenant modifions le fichier `BookPost.js` :
+
+```
+import React, { useState } from 'react';
+import { Text, View, Button, StyleSheet, TextInput, Label } from 'react-native';
+import { Formik } from 'formik';
+import * as Yup from 'yup';
+
+import { useAddNewBookMutation } from '../api/bookSlice'
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        padding: 10,
+        marginTop: 20,
+    },
+    formStyle: {
+        padding: 24,
+        borderWidth: 1,
+        borderRadius: 10,
+        borderRadius: 1,
+    },
+    inputStyle: {
+        borderWidth: 1,
+        borderColor: '#4e4e4e',
+        padding: 12,
+        marginBottom: 12,
+        textAlign: 'center',
+        fontSize: 18,
+    },
+    inputLablel: {
+        paddingTop: 10,
+        fontSize: 18,
+        height: 44,
+        fontWeight: "bold",
+    }
+});
+
+
+export const BookPost = () => {
+
+    const [addNewBook, { isLoading }] = useAddNewBookMutation()
+
+    const onSaveBookClicked = async (values) => {
+
+        const canSave = [values.author, values.book].every(Boolean) && !isLoading
+
+        if (canSave) {
+            try {
+                await addNewBook({ title: values.book, author: values.author }).unwrap()
+            } catch (err) {
+                console.error('Failed to save the post: ', err)
+            }
+        }
+    }
+
+    const MyReactNativeForm = props => (
+        <Formik
+            initialValues={{
+                book: "Le Machine learning avec Python !",
+                author: 1
+            }}
+            onSubmit={values => onSaveBookClicked(values)}
+            validationSchema={Yup.object({
+                book: Yup
+                    .string()
+                    .min(3, 'Must be 3 characters or less')
+                    .required('Required'),
+                author: Yup
+                    .number("Must be more than 0")
+                    .integer("Must be more than 0")
+                    .required('Required'),
+            })}
+        >
+            {({ handleChange,
+                handleBlur,
+                handleSubmit,
+                values,
+                errors,
+                touched,
+                isValid, }) => (
+                <View style={styles.formStyle}>
+                    <Text style={styles.inputLablel}>Book :</Text>
+                    <TextInput
+                        name="book"
+                        placeholder='Add a new book'
+                        onChangeText={handleChange('book')}
+                        onBlur={handleBlur('book')}
+                        style={styles.inputStyle}
+                    />
+                    {touched.book && errors.book &&
+                        <Text style={{ fontSize: 16, color: '#FF0D10' }}>{errors.book}</Text>
+                    }
+                    <Text style={styles.inputLablel}>Author :</Text>
+                    <TextInput
+                        name="author"
+                        placeholder='1'
+                        onChangeText={handleChange('author')}
+                        onBlur={handleBlur('author')}
+                        value={values.author}
+                        style={styles.inputStyle}
+                    />
+                    {touched.author && errors.author &&
+                        <Text style={{ fontSize: 16, color: '#FF0D10' }}>{errors.author}</Text>
+                    }
+                    <Button onPress={() => handleSubmit(values)} title="Submit" color="#6495ed" />
+                </View>
+            )}
+        </Formik>
+    );
+
+    return (
+        <View style={styles.container}>
+            <MyReactNativeForm />
+        </View>
+    )
+}
+```
+
+Nous avons défini "Le Machine learning avec Python !" et "1" pour valeurs initiales pour respectivement le titre et l'auteur du livre (`initialValues`). Ensuite, la librairie Yup nous a permis de définir les valeurs acceptées par le formulaire (`validationSchema`) : `title` est un `string` et `author` est un `integer`.
+
+Un formulaire est créé et les erreurs de remplissage d'informations sont affichées (`{touched.book && errors.book && <Text style={{ fontSize: 16, color: '#FF0D10' }}>{errors.book}</Text>}`). 
+
+
+### Connexion avec l'API : requête PUT
+
+Bouton de modification à côté du bouton de suppression.
 
 **A continuer : en cours !**
