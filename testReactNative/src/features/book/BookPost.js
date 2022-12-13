@@ -100,7 +100,7 @@ export const BookPost = () => {
                     {touched.author && errors.author &&
                         <Text style={{ fontSize: 16, color: '#FF0D10' }}>{errors.author}</Text>
                     }
-                    <Button onPress={() => handleSubmit(values)} title="Submit" color="#6495ed" />
+                    <Button onPress={handleSubmit} title="Add Book" color="#6495ed" />
                 </View>
             )}
         </Formik>

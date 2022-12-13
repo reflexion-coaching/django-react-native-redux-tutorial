@@ -540,7 +540,7 @@ Pour le moment, l'application affiche :
 * **Query works !** si la requête GET est un succès
 * **Query doesn't work !** si la requête échoue
 
-Seulement pour que les requêtes s'effectuent, il faut éditer le *store* de Redux avec le *reducer* créé dans `src/features/api/bookSlice.js`. Editons donc le fichier `src/reducers/store.js` :
+Seulement pour effectuer des requêtes, nous devons éditer le *store* de Redux avec le *reducer* créé dans `src/features/api/bookSlice.js`. Editons donc le fichier `src/reducers/store.js` :
 
 ```
 import { configureStore } from '@reduxjs/toolkit';
@@ -554,7 +554,7 @@ export const store = configureStore({
     getDefaultMiddleware().concat(bookApi.middleware)
 });
 ```
- Exellent ! Enfin, importons notre composant dans le fichier `App.js` et enveloppons notre application avec le store :
+Excellent ! Enfin, importons notre composant dans le fichier `App.js` et enveloppons notre application avec le store :
 
 ```
 import { StatusBar } from 'expo-status-bar';
@@ -781,7 +781,7 @@ export const bookApi = createApi({
 export const { useGetListOfBooksQuery, useAddNewBookMutation } = bookApi
 ```
 
-Les **tags** sont très utiles pour synchroniser la base de données avec l'application. 
+Les **tags** sont très utiles pour synchroniser la base de données avec l'application. Maintenant dès qu'un livre est ajouté à la base de données, la liste des livres affichée par l'application est automatiquement mise à jour. 
 
 ### Connexion avec l'API : requête DELETE
 
@@ -1007,7 +1007,7 @@ export const BookPost = () => {
 
 Nous avons défini "Le Machine learning avec Python !" et "1" pour valeurs initiales pour respectivement le titre et l'auteur du livre (`initialValues`). Ensuite, la librairie Yup nous a permis de définir les valeurs acceptées par le formulaire (`validationSchema`) : `title` est un `string` et `author` est un `integer`.
 
-Un formulaire est créé et les erreurs de remplissage d'informations sont affichées (`{touched.book && errors.book && <Text style={{ fontSize: 16, color: '#FF0D10' }}>{errors.book}</Text>}`). 
+Un formulaire est créé et les erreurs de remplissage d'informations sont affichées (`{touched.book && errors.book && <Text style={{ fontSize: 16, color: '#FF0D10' }}>{errors.book}</Text>}`). Si les données rentrées sont valides, un nouveau livre sera ajouté à la base de données. Sinon le bouton n'effectuera aucune action.
 
 
 ### Connexion avec l'API : requête PUT
