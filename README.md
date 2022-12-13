@@ -991,7 +991,7 @@ export const BookPost = () => {
                     {touched.author && errors.author &&
                         <Text style={{ fontSize: 16, color: '#FF0D10' }}>{errors.author}</Text>
                     }
-                    <Button onPress={() => handleSubmit(values)} title="Submit" color="#6495ed" />
+                    <Button onPress={handleSubmit} title="Submit" color="#6495ed" />
                 </View>
             )}
         </Formik>
@@ -1011,6 +1011,54 @@ Un formulaire est créé et les erreurs de remplissage d'informations sont affic
 
 
 ### Connexion avec l'API : requête PUT
+
+Après la lecture, la suppression et l'ajout, il ne reste plus qu'à mettre en place la modification des données. La modification se fait grâce aux requêtes POST. Commençons par ajouter un nouvel endpoint dans le fichier `bookSlice.js` :
+
+```
+import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
+
+export const bookApi = createApi({
+  reducerPath: 'bookApi',
+  baseQuery: fetchBaseQuery({ baseUrl: 'http://10.0.2.2:8000/api/v1/' }),
+  tagTypes: ['Book'],
+  endpoints: builder => ({
+    getListOfBooks: builder.query({
+      query: () => `books/`,
+      providesTags: ['Book']
+    }),
+    addNewBook: builder.mutation({
+      query: initialBook => ({
+        url: 'books/',
+        method: 'POST',
+        body: initialBook
+      }),
+      invalidatesTags: ['Book']
+    }),
+    deleteBook: builder.mutation({
+      query: (id) => ({
+        url: `/books/${id}/`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['Book'],
+    }),
+    updateBook: builder.mutation({ // new
+      query(data) {
+        const { id, ...body } = data
+        return {
+          url: `books/${id}/`,
+          method: 'PUT',
+          body,
+        }
+      },
+      invalidatesTags: ['Book'],
+    }),
+  })
+})
+
+export const { useGetListOfBooksQuery, useAddNewBookMutation, useDeleteBookMutation, useUpdateBookMutation } = bookApi
+```
+
+Le hook `useUpdateBookMutation` servira à updater les données dans le fichier `BookList.js`
 
 Bouton de modification à côté du bouton de suppression.
 

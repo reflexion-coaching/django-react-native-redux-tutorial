@@ -35,13 +35,13 @@ export const BookList = () => {
     const [deleteBook, response] = useDeleteBookMutation()
     const [updateBook, { isLoading: isUpdating }] = useUpdateBookMutation()
 
-    const onUpdateBookClicked = async (values, initialValues) => {
+    const onUpdateBookClicked = async (modifiedValues, initialValues) => {
 
-        const canSave = [initialValues.props.author, values.book, initialValues.props.id].every(Boolean)
+        const canSave = [initialValues.props.author, modifiedValues.book, initialValues.props.id].every(Boolean)
 
         if (canSave) {
             try {
-                await updateBook({ id: initialValues.props.id, title: values.book, author: initialValues.props.author }).unwrap()
+                await updateBook({ id: initialValues.props.id, title: modifiedValues.book, author: initialValues.props.author }).unwrap()
             } catch (err) {
                 console.error('Failed to save the post: ', err)
             }
@@ -79,12 +79,11 @@ export const BookList = () => {
                     {touched.book && errors.book &&
                         <Text style={{ fontSize: 16, color: '#FF0D10' }}>{errors.book}</Text>
                     }
-                    <Button onPress={(values) => handleSubmit(values, "test")} title="Modify Book" color="#6495ed" />
+                    <Button onPress={handleSubmit} title="Modify Book" color="#6495ed" />
                 </View>
             )}
         </Formik>
     );
-
 
     let content
 
