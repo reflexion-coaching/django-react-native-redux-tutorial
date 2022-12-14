@@ -8,8 +8,8 @@ import { useGetListOfBooksQuery, useDeleteBookMutation, useUpdateBookMutation } 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        padding: 22,
-        marginTop: 30,
+        alignItems: 'center', 
+        justifyContent: 'center'
     },
     item: {
         padding: 10,

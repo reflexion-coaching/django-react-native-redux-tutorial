@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Text, View, Button, StyleSheet, TextInput, Label } from 'react-native';
+import React from 'react';
+import { Text, View, Button, StyleSheet, TextInput } from 'react-native';
 import { Formik } from 'formik';
 import * as Yup from 'yup';
 
@@ -10,12 +10,6 @@ const styles = StyleSheet.create({
         flex: 1,
         padding: 10,
         marginTop: 20,
-    },
-    formStyle: {
-        padding: 24,
-        borderWidth: 1,
-        borderRadius: 10,
-        borderRadius: 1,
     },
     inputStyle: {
         borderWidth: 1,
@@ -76,7 +70,7 @@ export const BookPost = () => {
                 errors,
                 touched,
                 isValid, }) => (
-                <View style={styles.formStyle}>
+                <View>
                     <Text style={styles.inputLablel}>Book :</Text>
                     <TextInput
                         name="book"
