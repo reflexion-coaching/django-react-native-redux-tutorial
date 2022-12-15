@@ -1,7 +1,7 @@
 import { SignIn } from '../features/authentification/SignIn';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-const BookListScreen = ({ navigation }) => {
+const SignInScreen = () => {
   return (
     <SafeAreaView style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
       <SignIn />
@@ -9,4 +9,4 @@ const BookListScreen = ({ navigation }) => {
   )
 }
 
-export default BookListScreen;
+export default SignInScreen;

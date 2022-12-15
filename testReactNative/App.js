@@ -1,5 +1,4 @@
 import React from 'react';
-import { View, Button, Text } from "react-native"
 import { Provider } from 'react-redux';
 import { store } from './src/reducers/store';
 import { NavigationContainer } from '@react-navigation/native';
@@ -8,10 +7,23 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import BookListScreen from './src/screens/BookListScreen';
 import HomeScreen from './src/screens/HomeScreen'
-import { SignIn } from './src/features/authentification/SignIn';
+import SignInScreen from './src/screens/SignInScreen';
+import SignUpScreen from './src/screens/SignUpScreen';
+import WelcomeScreen from './src/screens/WelcomeScreen'
 import Ionicons from '@expo/vector-icons/Ionicons'
 
 const Tab = createBottomTabNavigator();
+const Stack = createNativeStackNavigator();
+
+function WelcomeNavigation() {
+  return (
+    <Stack.Navigator>
+      <Stack.Screen name="Welcome" component={WelcomeScreen} />
+      <Stack.Screen name="Sign-In" component={SignInScreen} options={{ title: 'Sign In' }} />
+      <Stack.Screen name="Sign-Up" component={SignUpScreen} options={{ title: 'Sign Up' }} />
+    </Stack.Navigator>
+  );
+}
 
 export default function App() {
   return (
@@ -30,7 +42,7 @@ export default function App() {
                   iconName = focused
                     ? 'book'
                     : 'book-outline';
-                } else if (route.name === 'Sign-In') {
+                } else if (route.name === 'Welcome Nav') {
                   iconName = focused
                     ? 'log-in'
                     : 'log-in-outline';
@@ -39,7 +51,7 @@ export default function App() {
               }
             })}
           >
-            <Tab.Screen name="Sign-In" component={SignIn} options={{ title: 'Sign In' }} />
+            <Tab.Screen name="Welcome Nav" component={WelcomeNavigation} options={{ title: 'Welcome', headerShown: false }} />
             <Tab.Screen name="Home" component={HomeScreen} options={{ title: 'Home' }} />
             <Tab.Screen name="Books" component={BookListScreen} options={{ title: 'Books' }} />
           </Tab.Navigator>

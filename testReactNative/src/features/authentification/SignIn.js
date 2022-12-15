@@ -2,6 +2,7 @@ import React from 'react';
 import { Text, View, Button, StyleSheet, TextInput } from 'react-native';
 import { Formik } from 'formik';
 import * as Yup from 'yup';
+import { useNavigation } from '@react-navigation/native';
 
 const styles = StyleSheet.create({
     container: {
@@ -26,7 +27,9 @@ const styles = StyleSheet.create({
 });
 
 
-export const SignIn = ({ navigation }) => {
+export const SignIn = () => {
+
+    const navigation = useNavigation();
 
     const SignInForm = props => (
         <Formik
@@ -35,7 +38,7 @@ export const SignIn = ({ navigation }) => {
                 email: "pierre@email.com",
                 password: "password"
             }}
-            onSubmit={() => navigation.navigate('Home')}
+            onSubmit={() => navigation.navigate('Sign-Up')}
             validationSchema={Yup.object({
                 username: Yup
                     .string()
