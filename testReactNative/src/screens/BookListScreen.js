@@ -1,10 +1,10 @@
-import { BookList } from '../features/book/BookList';
-import { BookPost } from '../features/book/BookPost';
+import BookList from '../features/book/BookList';
+import BookPost from '../features/book/BookPost';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-const BookListScreen = ({ navigation }) => {
+const BookListScreen = () => {
   return (
-    <SafeAreaView style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+    <SafeAreaView style={{ flex: 1 }}>
       <BookList />
       <BookPost />
     </SafeAreaView>

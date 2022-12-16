@@ -1,22 +1,26 @@
-import React from 'react';
-import { Text, View, Button, StyleSheet, FlatList, TextInput } from 'react-native';
-import { Formik } from 'formik';
-import * as Yup from 'yup';
+import React, { useState } from 'react';
+import { Text, View, Button, StyleSheet, FlatList } from 'react-native';
 
-import { useGetListOfBooksQuery, useDeleteBookMutation, useUpdateBookMutation } from '../api/bookSlice'
+import { useGetListOfBooksQuery, useDeleteBookMutation } from '../api/bookSlice'
+import UpdateModal from '../modal/UpdateModal';
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        alignItems: 'center', 
-        justifyContent: 'center'
-    },
     item: {
         padding: 10,
-        marginTop: 30,
+        marginTop: 10,
         fontSize: 18,
         height: 44,
         textAlign: 'center',
+    },
+    listItem: {
+        margin: 10,
+        padding: 10,
+        backgroundColor: "#FFF",
+        width: "80%",
+        flex: 1,
+        alignSelf: "center",
+        flexDirection: "column",
+        borderRadius: 5
     },
     inputStyle: {
         borderWidth: 1,
@@ -29,80 +33,48 @@ const styles = StyleSheet.create({
     },
 });
 
-export const BookList = () => {
+function RenderItemList({ item }) {
+
+    const [deleteBook, response] = useDeleteBookMutation()
+
+    return (
+        <View style={styles.listItem}>
+            <Text style={styles.item}>Titre {item.id} : {item.title}</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-evenly'}}>
+                <Button onPress={() => deleteBook(item.id)} title="Delete Book" color="#6495ed" />
+                <UpdateModal props={item} />
+            </View>
+        </View>
+    )
+}
+
+function GetBookList() {
 
     const { data, isLoading, isSuccess, isError, error } = useGetListOfBooksQuery()
-    const [deleteBook, response] = useDeleteBookMutation()
-    const [updateBook, { isLoading: isUpdating }] = useUpdateBookMutation()
-
-    const onUpdateBookClicked = async (modifiedValues, initialValues) => {
-
-        const canSave = [initialValues.props.author, modifiedValues.book, initialValues.props.id].every(Boolean)
-
-        if (canSave) {
-            try {
-                await updateBook({ id: initialValues.props.id, title: modifiedValues.book, author: initialValues.props.author }).unwrap()
-            } catch (err) {
-                console.error('Failed to save the post: ', err)
-            }
-        }
-    }
-
-    const UpdateForm = props => (
-        <Formik
-            initialValues={{
-                book: props.title,
-            }}
-            onSubmit={values => onUpdateBookClicked(values, props)}
-            validationSchema={Yup.object({
-                book: Yup
-                    .string()
-                    .min(3, 'Must be 3 characters or less')
-                    .required('Required'),
-            })}
-        >
-            {({ handleChange,
-                handleBlur,
-                handleSubmit,
-                values,
-                errors,
-                touched,
-                isValid, }) => (
-                <View>
-                    <TextInput
-                        name="book"
-                        placeholder='Modify book title'
-                        onChangeText={handleChange('book')}
-                        onBlur={handleBlur('book')}
-                        style={styles.inputStyle}
-                    />
-                    {touched.book && errors.book &&
-                        <Text style={{ fontSize: 16, color: '#FF0D10' }}>{errors.book}</Text>
-                    }
-                    <Button onPress={handleSubmit} title="Modify Book" color="#6495ed" />
-                </View>
-            )}
-        </Formik>
-    );
 
     let content
 
     if (isLoading) {
         content = <Text> Loading ... </Text>
     } else if (isSuccess) {
-        content = <FlatList data={data} renderItem={({ item }) => <View>
-            <Text style={styles.item}>Titre {item.id} : {item.title}</Text>
-            <Button onPress={() => deleteBook(item.id)} title="Delete Book" color="#6495ed"/>
-            <UpdateForm props={item}/>
-        </View>} />
+        content = <FlatList data={data} renderItem={({ item }) => <RenderItemList item={item} />} />
     } else if (isError) {
         content = <Text> Query doesn't work !</Text>
     }
 
     return (
-        <View style={styles.container}>
+        <View >
             {content}
         </View>
     )
-
 }
+
+const BookList = () => {
+    return (
+        <View >
+            <GetBookList />
+        </View>
+    )
+}
+
+export default BookList;
