@@ -902,12 +902,6 @@ const styles = StyleSheet.create({
         padding: 10,
         marginTop: 20,
     },
-    formStyle: {
-        padding: 24,
-        borderWidth: 1,
-        borderRadius: 10,
-        borderRadius: 1,
-    },
     inputStyle: {
         borderWidth: 1,
         borderColor: '#4e4e4e',
@@ -967,7 +961,7 @@ export const BookPost = () => {
                 errors,
                 touched,
                 isValid, }) => (
-                <View style={styles.formStyle}>
+                <View>
                     <Text style={styles.inputLablel}>Book :</Text>
                     <TextInput
                         name="book"
@@ -1058,8 +1052,1383 @@ export const bookApi = createApi({
 export const { useGetListOfBooksQuery, useAddNewBookMutation, useDeleteBookMutation, useUpdateBookMutation } = bookApi
 ```
 
-Le hook `useUpdateBookMutation` servira à updater les données dans le fichier `BookList.js`
+Le hook `useUpdateBookMutation` servira à updater les données dans le fichier `BookList.js` :
 
-Bouton de modification à côté du bouton de suppression.
+```
+import React from 'react';
+import { Text, View, Button, StyleSheet, FlatList, TextInput } from 'react-native';
+import { Formik } from 'formik';
+import * as Yup from 'yup';
 
-**A continuer : en cours !**
+import { useGetListOfBooksQuery, useDeleteBookMutation, useUpdateBookMutation } from '../api/bookSlice'
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        padding: 22,
+        marginTop: 30,
+    },
+    item: {
+        padding: 10,
+        marginTop: 30,
+        fontSize: 18,
+        height: 44,
+        textAlign: 'center',
+    },
+    inputStyle: {
+        borderWidth: 1,
+        borderColor: '#4e4e4e',
+        padding: 12,
+        marginBottom: 6,
+        marginTop: 12,
+        textAlign: 'center',
+        fontSize: 18,
+    },
+});
+
+export const BookList = () => {
+
+    const { data, isLoading, isSuccess, isError, error } = useGetListOfBooksQuery()
+    const [deleteBook, response] = useDeleteBookMutation()
+    const [updateBook, { isLoading: isUpdating }] = useUpdateBookMutation()
+
+    const onUpdateBookClicked = async (modifiedValues, initialValues) => {
+
+        const canSave = [initialValues.props.author, modifiedValues.book, initialValues.props.id].every(Boolean)
+
+        if (canSave) {
+            try {
+                await updateBook({ id: initialValues.props.id, title: modifiedValues.book, author: initialValues.props.author }).unwrap()
+            } catch (err) {
+                console.error('Failed to save the post: ', err)
+            }
+        }
+    }
+
+    const UpdateForm = props => (
+        <Formik
+            initialValues={{
+                book: props.title,
+            }}
+            onSubmit={values => onUpdateBookClicked(values, props)}
+            validationSchema={Yup.object({
+                book: Yup
+                    .string()
+                    .min(3, 'Must be 3 characters or less')
+                    .required('Required'),
+            })}
+        >
+            {({ handleChange,
+                handleBlur,
+                handleSubmit,
+                values,
+                errors,
+                touched,
+                isValid, }) => (
+                <View>
+                    <TextInput
+                        name="book"
+                        placeholder='Modify book title'
+                        onChangeText={handleChange('book')}
+                        onBlur={handleBlur('book')}
+                        style={styles.inputStyle}
+                    />
+                    {touched.book && errors.book &&
+                        <Text style={{ fontSize: 16, color: '#FF0D10' }}>{errors.book}</Text>
+                    }
+                    <Button onPress={handleSubmit} title="Modify Book" color="#6495ed" />
+                </View>
+            )}
+        </Formik>
+    );
+
+    let content
+
+    if (isLoading) {
+        content = <Text> Loading ... </Text>
+    } else if (isSuccess) {
+        content = <FlatList data={data} renderItem={({ item }) => <View>
+            <Text style={styles.item}>Titre {item.id} : {item.title}</Text>
+            <Button onPress={() => deleteBook(item.id)} title="Delete Book" color="#6495ed"/>
+            <UpdateForm props={item}/>
+        </View>} />
+    } else if (isError) {
+        content = <Text> Query doesn't work !</Text>
+    }
+
+    return (
+        <View style={styles.container}>
+            {content}
+        </View>
+    )
+
+}
+```
+
+Bien :) Le petit formulaire Formik ne contenant qu'un champ "titre" permet de modifier le titre des livres dans la base de données ! Nous pourrions améliorer la gestion des erreurs mais nous verrons ça après l'authentification car cette partie nécessite d'être attentif aux réponses du serveur. Pour le moment, nous avons déjà une application capable d'effectuer des requêtes GET, POST, DELETE et PUT :)
+
+### Navigation 
+
+La navigation sur une application est un peu différente de la navigation web. Les balises `link` ou `href` ne sont plus utilisées. A la place, nous allons utiliser la librairie **React Navigation**. Le très bon tutoriel officiel de la librairie est disponible à l'adresse https://reactnavigation.org/docs/getting-started. Nous allons nous en inspirer pour parfaire notre exemple. 
+
+Commençons par installer les dépendances nécessaires :
+
+```
+$ npx expo install react-native-screens react-native-safe-area-context
+
+$ npm install @react-navigation/native-stack
+
+$ npm install @react-navigation/bottom-tabs@^5.x
+```
+
+Ensuite, créons un dossier pour les écrans et deux écrans *HomeScreen.js* et *BookListScreen.js* :
+
+```
+$ mkdir src/screens
+
+$ touch src/screens/HomeScreen.js
+
+$ touch src/screens/BookListScreen.js
+```
+
+Le fichier `BookListScreen.js` contiendra le code actuel d'affichage et de modification des listes tandis que `HomeScreen.js` affichera un petit message d'accueil. Par la suite, nous ajouterons des écrans de connexion et authentification. 
+
+Ajoutons le code de `src/features/BookList.js` dans `BookListScreen.js` :
+
+```
+import { BookList } from '../features/book/BookList';
+import { BookPost } from '../features/book/BookPost';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+const BookListScreen = ({ navigation }) => {
+  return (
+    <SafeAreaView style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+      <BookList />
+      <BookPost />
+    </SafeAreaView>
+  )
+}
+
+export default BookListScreen;
+```
+
+Bien et ajoutons un petit message d'accueil dans `HomeScreen.js` :
+
+```
+import { Text, Button, StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 10,
+    },
+    textStyle: {
+        fontSize: 36,
+        fontWeight: "bold",
+        marginBottom: 10
+    }
+});
+
+const HomeScreen = ({ navigation }) => {
+    return (
+        <SafeAreaView style={styles.container}>
+            <Text style={styles.textStyle}>Home Screen</Text>
+            <Button
+                title="Go to Book List"
+                onPress={() => navigation.navigate('Books')}
+                color="#6495ed"
+            />
+        </SafeAreaView>
+    );
+}
+
+export default HomeScreen;
+```
+
+Enfin enveloppons l'application dans notre objet de navigation (`App.js`) :
+
+```
+import React from 'react';
+import { View, Button, Text } from "react-native"
+import { Provider } from 'react-redux';
+import { store } from './src/reducers/store';
+import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import BookListScreen from './src/screens/BookListScreen';
+import HomeScreen from './src/screens/HomeScreen'
+import Ionicons from '@expo/vector-icons/Ionicons'
+
+const Tab = createBottomTabNavigator();
+
+export default function App() {
+  return (
+    <Provider store={store}>
+      <SafeAreaProvider>
+        <NavigationContainer>
+          <Tab.Navigator
+            screenOptions={({ route }) => ({
+              tabBarIcon: ({ focused, color, size }) => {
+                let iconName;
+                if (route.name === 'Home') {
+                  iconName = focused
+                    ? 'home'
+                    : 'home-outline';
+                } else if (route.name === 'Books') {
+                  iconName = focused
+                    ? 'book'
+                    : 'book-outline';
+                }
+                return <Ionicons name={iconName} size={size} color={color} />;
+              }
+            })}
+          >
+            <Tab.Screen name="Home" component={HomeScreen} options={{ title: 'Home' }} />
+            <Tab.Screen name="Books" component={BookListScreen} options={{ title: 'Books' }} />
+          </Tab.Navigator>
+        </NavigationContainer>
+      </SafeAreaProvider>
+    </Provider>
+  );
+}
+```
+
+Nous avons un menu de navigation en bas de notre écran ;) C'est déjà pas mal ! Seulement en prévision de la mise en place de l'authentification, ajoutons deux écrans : 1) pour l'inscription d'un nouvel utilisateur (*Sign-In*) 2) pour la connexion d'un utilisateur existant (*Sign-Up*). 
+
+Commençons par créer `src/screens/SignInScreen.js` et `src/screens/SignUpScreen.js` ainsi qu'un écran de bienvenue `src/screens/WelcomeScreen.js` qui accueillera les visiteurs non-authentifiés. 
+
+```
+$ touch src/screens/SignInScreen.js
+
+$ touch src/screens/SignUpScreen.js
+
+$ touch src/screens/WelcomeScreen.js
+```
+
+Le code de `SignInScreen.js` sera écrit dans `src/authentification/SignIn.js` et le code de `SignUpScreen.js` dans `src/authentification/SignUp.js` :
+
+```
+$ mkdir src/features/authentification
+
+$ touch src/features/authentification/SignIn.js
+
+$ touch src/features/authentification/SignUp.js
+
+$ touch src/features/authentification/Welcome.js
+```
+
+Pour le moment, ajoutons simplement une troisième page à notre menu **Tab** qui pointera vers la page `Welcome.js`. Cette page permettra de choisir entre **SignIn** et **Sign-Up**. La page `SignIn.js` renverra vers la page `SignUp.js` qui elle-même renverra vers la page `Home`. 
+
+Bien commençons par éditer `src/features/authentification/SignIn.js` :
+
+```
+import React from 'react';
+import { Text, View, Button, StyleSheet, TextInput } from 'react-native';
+import { Formik } from 'formik';
+import * as Yup from 'yup';
+import { useNavigation } from '@react-navigation/native';
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        padding: 10,
+        marginTop: 20,
+    },
+    inputStyle: {
+        borderWidth: 1,
+        borderColor: '#4e4e4e',
+        padding: 12,
+        marginBottom: 12,
+        textAlign: 'center',
+        fontSize: 18,
+    },
+    inputLablel: {
+        paddingTop: 10,
+        fontSize: 18,
+        height: 44,
+        fontWeight: "bold",
+    }
+});
+
+
+export const SignIn = () => {
+
+    const navigation = useNavigation();
+
+    const SignInForm = props => (
+        <Formik
+            initialValues={{
+                username: "Pierre",
+                email: "pierre@email.com",
+                password: "password"
+            }}
+            onSubmit={() => navigation.navigate('Sign-Up')}
+            validationSchema={Yup.object({
+                username: Yup
+                    .string()
+                    .min(3, 'Must be 3 characters or less')
+                    .required('Required'),
+                email: Yup
+                    .string()
+                    .email("email is not valid")
+                    .required('Required'),
+                password: Yup
+                    .string()
+                    .min(3, 'Must be 3 characters or less')
+                    .required('Required')
+            })}
+        >
+            {({ handleChange,
+                handleBlur,
+                handleSubmit,
+                values,
+                errors,
+                touched,
+                isValid, }) => (
+                <View>
+                    <Text style={styles.inputLablel}>Username :</Text>
+                    <TextInput
+                        name="username"
+                        placeholder='username'
+                        onChangeText={handleChange('username')}
+                        onBlur={handleBlur('username')}
+                        value={values.username}
+                        style={styles.inputStyle}
+                    />
+                    {touched.username && errors.username &&
+                        <Text style={{ fontSize: 16, color: '#FF0D10' }}>{errors.username}</Text>
+                    }
+                    <Text style={styles.inputLablel}>Email :</Text>
+                    <TextInput
+                        name="email"
+                        placeholder='email'
+                        onChangeText={handleChange('email')}
+                        onBlur={handleBlur('email')}
+                        value={values.email}
+                        style={styles.inputStyle}
+                    />
+                    {touched.email && errors.email &&
+                        <Text style={{ fontSize: 16, color: '#FF0D10' }}>{errors.email}</Text>
+                    }
+                    <Text style={styles.inputLablel}>Password :</Text>
+                    <TextInput
+                        name="password"
+                        placeholder='password'
+                        onChangeText={handleChange('password')}
+                        onBlur={handleBlur('password')}
+                        value={values.password}
+                        style={styles.inputStyle}
+                    />
+                    {touched.password && errors.password &&
+                        <Text style={{ fontSize: 16, color: '#FF0D10' }}>{errors.password}</Text>
+                    }
+                    <View style={{ paddingTop: 20 }}>
+                    <Button onPress={handleSubmit} title="Sign In" color="#6495ed"/>
+                    </View>
+                </View>
+            )}
+        </Formik>
+    );
+
+    return (
+        <View style={styles.container}>
+            <SignInForm />
+        </View>
+    )
+}
+```
+
+Ensuite `src/features/authentification/SignUp.js` :
+
+```
+import React from 'react';
+import { Text, View, Button, StyleSheet, TextInput } from 'react-native';
+import { Formik } from 'formik';
+import * as Yup from 'yup';
+import { useNavigation } from '@react-navigation/native';
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        padding: 10,
+        marginTop: 20,
+    },
+    inputStyle: {
+        borderWidth: 1,
+        borderColor: '#4e4e4e',
+        padding: 12,
+        marginBottom: 12,
+        textAlign: 'center',
+        fontSize: 18,
+    },
+    inputLablel: {
+        paddingTop: 10,
+        fontSize: 18,
+        height: 44,
+        fontWeight: "bold",
+    }
+});
+
+
+export const SignUp = () => {
+
+    const navigation = useNavigation();
+
+    const SignUpForm = props => (
+        <Formik
+            initialValues={{
+                username: "Pierre",
+                email: "pierre@email.com",
+                password: "password"
+            }}
+            onSubmit={() => navigation.navigate('Home')}
+            validationSchema={Yup.object({
+                username: Yup
+                    .string()
+                    .min(3, 'Must be 3 characters or less')
+                    .required('Required'),
+                password: Yup
+                    .string()
+                    .min(3, 'Must be 3 characters or less')
+                    .required('Required')
+            })}
+        >
+            {({ handleChange,
+                handleBlur,
+                handleSubmit,
+                values,
+                errors,
+                touched,
+                isValid, }) => (
+                <View>
+                    <Text style={styles.inputLablel}>Username :</Text>
+                    <TextInput
+                        name="username"
+                        placeholder='username'
+                        onChangeText={handleChange('username')}
+                        onBlur={handleBlur('username')}
+                        value={values.username}
+                        style={styles.inputStyle}
+                    />
+                    {touched.username && errors.username &&
+                        <Text style={{ fontSize: 16, color: '#FF0D10' }}>{errors.username}</Text>
+                    }
+                    <Text style={styles.inputLablel}>Password :</Text>
+                    <TextInput
+                        name="password"
+                        placeholder='password'
+                        onChangeText={handleChange('password')}
+                        onBlur={handleBlur('password')}
+                        value={values.password}
+                        style={styles.inputStyle}
+                    />
+                    {touched.password && errors.password &&
+                        <Text style={{ fontSize: 16, color: '#FF0D10' }}>{errors.password}</Text>
+                    }
+                    <View style={{ paddingTop: 20 }}>
+                    <Button onPress={handleSubmit} title="Sign Up" color="#6495ed"/>
+                    </View>
+                </View>
+            )}
+        </Formik>
+    );
+
+    return (
+        <View style={styles.container}>
+            <SignUpForm />
+        </View>
+    )
+}
+```
+
+Comme on peut le voir, une fois que l'on a fait un formulaire, les autres suivent très facilement. La page `src/features/authentification/SignUp.js` contient deux boutons qui renvoient vers le **SignIn** ou le **SignOut** :
+
+```
+import { Text, Button, StyleSheet, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 10,
+    },
+    textStyle: {
+        fontSize: 36,
+        fontWeight: "bold",
+        marginBottom: 10
+    }
+});
+
+const Welcome = ({ navigation }) => {
+    return (
+        <SafeAreaView style={styles.container}>
+            <Text style={styles.textStyle}>Welcome Screen</Text>
+            <View style={{ flexDirection: 'row' }}>
+                <View style={{ padding: 5 }}>
+                    <Button
+                        title="Go to Sign-Up"
+                        onPress={() => navigation.navigate('Sign-Up')}
+                        color="#6495ed"
+                    />
+                </View>
+                <View style={{ padding: 5 }}>
+                    <Button
+                        title="Go to Sign-In"
+                        onPress={() => navigation.navigate('Sign-In')}
+                        color="#6495ed"
+                    />
+                </View>
+            </View>
+        </SafeAreaView>
+    );
+}
+
+export default Welcome;
+```
+
+Parfait ! Il ne reste plus qu'à importer ces trois functions dans leur écran respectif. Commençons par `src/screens/SignInScreen.js` :
+
+```
+import { SignIn } from '../features/authentification/SignIn';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+const SignInScreen = () => {
+  return (
+    <SafeAreaView style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+      <SignIn />
+    </SafeAreaView>
+  )
+}
+
+export default SignInScreen;
+```
+
+`src/screens/SignUpScreen.js` est très similaire :
+
+```
+import { SignUp } from '../features/authentification/SignUp';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+const SignUpScreen = () => {
+  return (
+    <SafeAreaView style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+      <SignUp />
+    </SafeAreaView>
+  )
+}
+
+export default SignUpScreen;
+```
+
+et enfin `src/screens/WelcomeScreen.js` :
+
+```
+import { Text, Button, StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import Welcome from '../features/authentification/Welcome'
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 10,
+    }
+});
+
+const WelcomeScreen = ({ navigation }) => {
+    return (
+        <SafeAreaView style={styles.container}>
+            <Welcome navigation={navigation} />
+        </SafeAreaView>
+    );
+}
+
+export default WelcomeScreen;
+```
+
+Super :) Un peu long mais pas très compliqué à mettre en oeuvre. Finalement, il ne reste plus qu'à ajouter ces écrans dans un `Stack.Navigator`. Ce `Stack.Navigator` gérera la navigation entre les composants `Welcome.js`, `SignIn.js` et `SignUp.js` et sera à l'intérieur du navigateur principal **Tab**. Pour cela, créons une fonction `WelcomeNavigation` dans `App.js` :
+
+```
+import React from 'react';
+import { Provider } from 'react-redux';
+import { store } from './src/reducers/store';
+import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import BookListScreen from './src/screens/BookListScreen';
+import HomeScreen from './src/screens/HomeScreen'
+import SignInScreen from './src/screens/SignInScreen';
+import SignUpScreen from './src/screens/SignUpScreen';
+import WelcomeScreen from './src/screens/WelcomeScreen'
+import Ionicons from '@expo/vector-icons/Ionicons'
+
+const Tab = createBottomTabNavigator();
+const Stack = createNativeStackNavigator();
+
+function WelcomeNavigation() {
+  return (
+    <Stack.Navigator>
+      <Stack.Screen name="Welcome" component={WelcomeScreen} />
+      <Stack.Screen name="Sign-In" component={SignInScreen} options={{ title: 'Sign In' }} />
+      <Stack.Screen name="Sign-Up" component={SignUpScreen} options={{ title: 'Sign Up' }} />
+    </Stack.Navigator>
+  );
+}
+
+export default function App() {
+  return (
+    <Provider store={store}>
+      <SafeAreaProvider>
+        <NavigationContainer>
+          <Tab.Navigator
+            screenOptions={({ route }) => ({
+              tabBarIcon: ({ focused, color, size }) => {
+                let iconName;
+                if (route.name === 'Home') {
+                  iconName = focused
+                    ? 'home'
+                    : 'home-outline';
+                } else if (route.name === 'Books') {
+                  iconName = focused
+                    ? 'book'
+                    : 'book-outline';
+                } else if (route.name === 'Welcome Nav') {
+                  iconName = focused
+                    ? 'log-in'
+                    : 'log-in-outline';
+                }
+                return <Ionicons name={iconName} size={size} color={color} />;
+              }
+            })}
+          >
+            <Tab.Screen name="Welcome Nav" component={WelcomeNavigation} options={{ title: 'Welcome', headerShown: false }} />
+            <Tab.Screen name="Home" component={HomeScreen} options={{ title: 'Home' }} />
+            <Tab.Screen name="Books" component={BookListScreen} options={{ title: 'Books' }} />
+          </Tab.Navigator>
+        </NavigationContainer>
+      </SafeAreaProvider>
+    </Provider>
+  );
+}
+```
+
+CQFD ! Nous avons maintenant deux navigateurs : un "stack" pour la navigation "Welcome" et un "tab" pour la navigation générale. 
+
+### Modal
+
+Avant de mettre en place l'authentification, modifions un tout petit peu la liste des livres afin de la rendre plus jolie. Plutôt que d'afficher les formulaires de modification et de création d'un livre, nous allons utiliser les  boutons qui ouvriront des petites fenêtres pop-up (les *modals*) contenant les formulaires. 
+
+La documentation officielle de React Native sur les modals est disponible à https://reactnative.dev/docs/modal. 
+
+Bien commençons par créer un nouveau dossier `src/features/form` qui contiendra les formulaires. Il est plus propre d'écrire les formulaires dans des fichiers dédiés. `src/features/form/CreateForm.js` ressemble à : 
+
+```
+import React from 'react';
+import { Text, View, Button, StyleSheet, FlatList, TextInput } from 'react-native';
+import { Formik } from 'formik';
+import * as Yup from 'yup';
+
+import { useAddNewBookMutation } from '../api/bookSlice'
+
+const styles = StyleSheet.create({
+    inputStyle: {
+        borderWidth: 1,
+        borderColor: '#4e4e4e',
+        padding: 12,
+        marginBottom: 12,
+        textAlign: 'center',
+        fontSize: 18,
+    },
+    inputLablel: {
+        paddingTop: 10,
+        fontSize: 18,
+        height: 44,
+        fontWeight: "bold",
+    },
+});
+
+function CreateForm() {
+
+    const [addNewBook, { isLoading }] = useAddNewBookMutation()
+
+    const onSaveBookClicked = async (values) => {
+
+        const canSave = [values.author, values.book].every(Boolean) && !isLoading
+
+        if (canSave) {
+            try {
+                await addNewBook({ 'title': values.book, 'author': values.author }).unwrap()
+            } catch (err) {
+                <Text style={{ fontSize: 16, color: '#FF0D10' }}>{err}</Text>
+
+            }
+        }
+    }
+
+    return (
+        <Formik
+            initialValues={{
+                book: "Le Machine learning avec Python !",
+                author: 1
+            }}
+            onSubmit={values => onSaveBookClicked(values)}
+            validationSchema={Yup.object({
+                book: Yup
+                    .string()
+                    .min(3, 'Must be 3 characters or less')
+                    .required('Required'),
+                author: Yup
+                    .number("Must be more than 0")
+                    .integer("Must be more than 0")
+                    .required('Required'),
+            })}
+        >
+            {({ handleChange,
+                handleBlur,
+                handleSubmit,
+                values,
+                errors,
+                touched,
+                isValid, }) => (
+                <View>
+                    <Text style={styles.inputLablel}>Book :</Text>
+                    <TextInput
+                        name="book"
+                        placeholder='Add a new book'
+                        onChangeText={handleChange('book')}
+                        onBlur={handleBlur('book')}
+                        style={styles.inputStyle}
+                    />
+                    {touched.book && errors.book &&
+                        <Text style={{ fontSize: 16, color: '#FF0D10' }}>{errors.book}</Text>
+                    }
+                    <Text style={styles.inputLablel}>Author :</Text>
+                    <TextInput
+                        name="author"
+                        placeholder='1'
+                        onChangeText={handleChange('author')}
+                        onBlur={handleBlur('author')}
+                        value={values.author}
+                        style={styles.inputStyle}
+                    />
+                    {touched.author && errors.author &&
+                        <Text style={{ fontSize: 16, color: '#FF0D10' }}>{errors.author}</Text>
+                    }
+                    <Button onPress={handleSubmit} title="Add Book" color="#6495ed" />
+                </View>
+            )}
+        </Formik>
+    );
+}
+
+export default CreateForm;
+```
+
+`src/features/form/UpdateForm.js` contient :
+
+```
+import React from 'react';
+import { Text, View, Button, StyleSheet, FlatList, TextInput } from 'react-native';
+import { Formik } from 'formik';
+import * as Yup from 'yup';
+
+import { useUpdateBookMutation } from '../api/bookSlice'
+
+const styles = StyleSheet.create({
+    inputStyle: {
+        borderWidth: 1,
+        borderColor: '#4e4e4e',
+        padding: 12,
+        marginBottom: 12,
+        marginTop: 12,
+        textAlign: 'center',
+        fontSize: 18,
+    },
+});
+
+function UpdateForm( {props} ) {
+
+    const [updateBook, { isLoading: isUpdating }] = useUpdateBookMutation()
+
+    const onUpdateBookClicked = async (modifiedValues, props) => {
+
+        const canSave = [props.author, modifiedValues.book, props.id].every(Boolean)
+
+        if (canSave) {
+            try {
+                await updateBook({ id: props.id, title: modifiedValues.book, author: props.author }).unwrap()
+            } catch (err) {
+                console.error('Failed to save the post: ', err)
+            }
+        }
+    }
+
+    return (
+    <Formik
+        initialValues={{
+            book: props.title,
+        }}
+        onSubmit={values => onUpdateBookClicked(values, props)}
+        validationSchema={Yup.object({
+            book: Yup
+                .string()
+                .min(3, 'Must be 3 characters or less')
+                .required('Required'),
+        })}
+    >
+        {({ handleChange,
+            handleBlur,
+            handleSubmit,
+            values,
+            errors,
+            touched,
+            isValid, }) => (
+            <View>
+                <TextInput
+                    name="book"
+                    placeholder='Modify book title'
+                    onChangeText={handleChange('book')}
+                    onBlur={handleBlur('book')}
+                    style={styles.inputStyle}
+                    value={values.book}
+                />
+                {touched.book && errors.book &&
+                    <Text style={{ fontSize: 16, color: '#FF0D10' }}>{errors.book}</Text>
+                }
+                <Button onPress={handleSubmit} title="Modify Book" color="#6495ed" />
+            </View>
+        )}
+    </Formik>
+    )
+}
+
+export default UpdateForm;
+```
+
+Bien ! Maintenant créons un nouveau dossier `src/features/modal` et ajoutant `src/features/modal/CreateModal.js` ainsi que `src/features/modal/UpdateModal.js`. `src/features/modal/CreateModal.js` ressemble à :
+
+```
+import React, { useState } from 'react';
+import { View, Modal, StyleSheet, Pressable, Text } from 'react-native';
+
+import CreateForm from '../form/CreateForm';
+
+const styles = StyleSheet.create({
+    containerModal: {
+        flexDirection: 'row',
+        position: 'absolute',
+        alignItems: 'center',
+        justifyContent: 'center',
+        right: 15,
+        bottom: 15,
+    },
+    modalView: {
+        margin: 20,
+        alignItems: 'center',
+        backgroundColor: "white",
+        borderRadius: 10,
+        padding: 35,
+        alignItems: "center",
+        shadowColor: "#000",
+        shadowOffset: {
+            width: 0,
+            height: 2
+        },
+        shadowOpacity: 0.25,
+        shadowRadius: 4,
+        elevation: 5
+    },
+    button: {
+        borderRadius: 20,
+        padding: 10,
+        elevation: 10,
+        backgroundColor: "#DE271F",
+    },
+    buttonClose: {
+        backgroundColor: "#6495ed",
+        marginTop: 22,
+    },
+    textStyle: {
+        color: "white",
+        fontWeight: "bold",
+        textAlign: "center",
+    }
+});
+
+const CreateModal = () => {
+    const [modalVisible, setModalVisible] = useState(false);
+    return (
+        <View style={styles.containerModal}>
+            <Modal
+                animationType="slide"
+                transparent={true}
+                visible={modalVisible}
+                onRequestClose={() => { setModalVisible(!modalVisible); }}>
+                <View>
+                    <View style={styles.modalView}>
+                        <CreateForm />
+                        <Pressable
+                            style={[styles.button, styles.buttonClose]}
+                            onPress={() => setModalVisible(!modalVisible)}
+                        >
+                            <Text style={styles.textStyle}>Close</Text>
+                        </Pressable>
+                    </View>
+                </View>
+            </Modal>
+            <Pressable
+                style={styles.button}
+                onPress={() => setModalVisible(true)}
+            >
+                <Text style={styles.textStyle}>Add book</Text>
+            </Pressable>
+        </View>
+    );
+};
+
+export default CreateModal;
+```
+
+Un modal dépend généralement d'un état local (ici `modalVisible`) qui est égal à `true` quand le modal est affiché et `false` quand il est caché. Ainsi un modal peut être vu comme un bout de code tantôt caché tantôt affiché. `src/features/modal/UpdateModal.js` contient :
+
+```
+import React, { useState } from 'react';
+import { View, Button, Modal, StyleSheet } from 'react-native';
+
+import UpdateForm from '../form/UpdateForm'
+
+const styles = StyleSheet.create({
+    containerModal: {
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    modalView: {
+        margin: 20,
+        alignItems: 'center',
+        backgroundColor: "white",
+        borderRadius: 10,
+        padding: 35,
+        alignItems: "center",
+        shadowColor: "#000",
+        shadowOffset: {
+            width: 0,
+            height: 2
+        },
+        shadowOpacity: 0.25,
+        shadowRadius: 4,
+        elevation: 5
+    },
+    button: {
+        padding: 10,
+        elevation: 10,
+        backgroundColor: "#6495ed",
+        borderRadius: 2
+    },
+    buttonClose: {
+        backgroundColor: "#6495ed",
+        marginTop: 22,
+    },
+
+});
+
+const UpdateModal = ({ props }) => {
+
+    const [modalVisible, setModalVisible] = useState(false);
+    return (
+        <View style={styles.containerModal}>
+            <Modal
+                animationType="slide"
+                transparent={true}
+                visible={modalVisible}
+                onRequestClose={() => { setModalVisible(!modalVisible); }}>
+                <View>
+                    <View style={styles.modalView}>
+                        <UpdateForm props={props} />
+                        <View style={{marginTop:10}}>
+                            <Button
+                                onPress={() => setModalVisible(!modalVisible)}
+                                title='Close'
+                                color="#6495ed"
+                            />
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+            <Button
+                onPress={() => setModalVisible(true)}
+                title='Update book'
+                color="#6495ed"
+            />
+        </View>
+    );
+};
+
+export default UpdateModal;
+```
+
+Et voilà :) Ce modal-ci est déclenché par un bouton et non plus un pressable mais le processus est le même. Il ne reste plus qu'à modifier `BookPost.js` :
+
+```
+import { View } from 'react-native';
+import CreateModal from '../modal/CreateModal';
+
+const BookPost = () => {
+
+    return (
+        <View style={{ flex: 1 }}>
+            <CreateModal />
+        </View>
+    )
+}
+
+export default BookPost;
+```
+
+et `BookList.js` :
+
+```
+import React, { useState } from 'react';
+import { Text, View, Button, StyleSheet, FlatList } from 'react-native';
+
+import { useGetListOfBooksQuery, useDeleteBookMutation } from '../api/bookSlice'
+import UpdateModal from '../modal/UpdateModal';
+
+const styles = StyleSheet.create({
+    item: {
+        padding: 10,
+        marginTop: 10,
+        fontSize: 18,
+        height: 44,
+        textAlign: 'center',
+    },
+    listItem: {
+        margin: 10,
+        padding: 10,
+        backgroundColor: "#FFF",
+        width: "80%",
+        flex: 1,
+        alignSelf: "center",
+        flexDirection: "column",
+        borderRadius: 5
+    },
+    inputStyle: {
+        borderWidth: 1,
+        borderColor: '#4e4e4e',
+        padding: 12,
+        marginBottom: 6,
+        marginTop: 12,
+        textAlign: 'center',
+        fontSize: 18,
+    },
+});
+
+function RenderItemList({ item }) {
+
+    const [deleteBook, response] = useDeleteBookMutation()
+
+    return (
+        <View style={styles.listItem}>
+            <Text style={styles.item}>Titre {item.id} : {item.title}</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-evenly'}}>
+                <Button onPress={() => deleteBook(item.id)} title="Delete Book" color="#6495ed" />
+                <UpdateModal props={item} />
+            </View>
+        </View>
+    )
+}
+
+function GetBookList() {
+
+    const { data, isLoading, isSuccess, isError, error } = useGetListOfBooksQuery()
+
+    let content
+
+    if (isLoading) {
+        content = <Text> Loading ... </Text>
+    } else if (isSuccess) {
+        content = <FlatList data={data} renderItem={({ item }) => <RenderItemList item={item} />} />
+    } else if (isError) {
+        content = <Text> Query doesn't work !</Text>
+    }
+
+    return (
+        <View >
+            {content}
+        </View>
+    )
+}
+
+const BookList = () => {
+    return (
+        <View >
+            <GetBookList />
+        </View>
+    )
+}
+
+export default BookList;
+```
+
+Comme nous avons modifié l'export des composants `BookPost` et `BookList`, nous devons changer leur importation dans `BookListScreen.js` :
+
+```
+import BookList from '../features/book/BookList';
+import BookPost from '../features/book/BookPost';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+const BookListScreen = () => {
+  return (
+    <SafeAreaView style={{ flex: 1 }}>
+      <BookList />
+      <BookPost />
+    </SafeAreaView>
+  )
+}
+
+export default BookListScreen;
+```
+
+Génial ! Nos composants sont plus propres ainsi que notre application :) 
+
+## Django REST Framwork : Permissions et Authentification
+
+L'application permet d'effectuer les quatre opérations CRUD principales : GET, POST, DELETE et PUT. A l'heure actuelle, tout le monde peut effectuer n'importe quelles requêtes sans s'authentifier. Cela pose deux problèmes de sécurité : 
+
+* Tous les utilisateurs ont accès à tous les endpoints : modifions **les permissions** pour n'autoriser l'accès qu'aux utilisateurs authentifiés. 
+
+* L'authentification est très basique : les librairies **dj-rest-auth** et **django-allauth** permettent un meilleur contrôle des authentifications et de l'enregistrement des utilisateurs. 
+
+Mais d'abord, modifions un petit peu la structure de l'API pour que les endpoints relatifs aux utilisateurs soient gérés dans l'application *accounts*. 
+
+### Modifications de l'application *accounts*
+
+#### Modification des vues
+
+`accounts/views.py` :
+
+```
+from django.contrib.auth import get_user_model
+from rest_framework import viewsets
+
+from .serializers import UserSerializer 
+
+class UserViewSet(viewsets.ModelViewSet): 
+    queryset = get_user_model().objects.all() 
+    serializer_class = UserSerializer
+
+```
+
+et `books/views.py` :
+
+```
+# posts/views.py
+from rest_framework import viewsets
+
+from .models import Book
+from .serializers import BookSerializer
+
+class BookViewSet(viewsets.ModelViewSet): 
+    queryset = Book.objects.all() 
+    serializer_class = BookSerializer
+```
+
+#### Modification des serializers
+
+```
+$ touch accounts/serializers.py
+```
+
+`accounts/serializers.py` :
+
+```
+from django.contrib.auth import get_user_model # new
+from rest_framework import serializers
+
+class UserSerializer(serializers.ModelSerializer): 
+    class Meta:
+        model = get_user_model() 
+        fields = ("id", "username",)
+```
+
+`books/serializers.py`:
+
+```
+# books/serializers.py
+from rest_framework import serializers
+from .models import Book
+
+
+class BookSerializer(serializers.ModelSerializer):
+    class Meta:
+        fields = (
+            "id",
+            "author",
+            "title",
+            "created_at",
+        )
+        model = Book
+```
+
+#### Modification des urls
+
+```
+$ touch accounts/urls.py
+```
+
+`accounts/urls.py` :
+
+```
+from django.urls import path
+from rest_framework.routers import SimpleRouter
+
+from .views import UserViewSet
+
+router = SimpleRouter()
+router.register("users", UserViewSet, basename="users")
+
+urlpatterns = router.urls
+```
+
+`books/urls.py`:
+
+```
+# posts/urls.py
+from django.urls import path
+from rest_framework.routers import SimpleRouter
+
+from .views import BookViewSet
+
+router = SimpleRouter()
+router.register("books", BookViewSet, basename="books")
+
+urlpatterns = router.urls
+```
+
+`tutorial_project/urls.py` :
+
+```
+# django_project/urls.py
+from django.contrib import admin 
+from django.urls import path, include
+
+urlpatterns = [
+    path("admin/", admin.site.urls),
+    path("api/v1/", include("books.urls")),
+    path("api/v1/", include("accounts.urls")),
+]
+```
+
+Excellent ! Le code fonctionne comme précédemment mais il est un peu plus propre. 
+
+### Permissions
+
+#### Project-Level Permissions
+
+Pour le moment, tout le monde a accès à notre API. En effet, dans `tutorial_project/settings.py`, les permissions sont accordées à tout le monde via `AllowAny` :
+
+```
+REST_FRAMEWORK = { 
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.AllowAny",
+    ],
+}
+```
+
+Modifions `AllowAny` en `IsAuthenticated` :
+
+```
+REST_FRAMEWORK = {
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",  # new
+    ],
+}
+```
+
+Maintenant seuls les utilisateurs authentifiés ont accès à l'application. Si on va à l'adresse http://127.0.0.1:8000/api/v1/users/, l'API nous renvoie un message d'erreur 403 ! Par-contre, authentifions-nous à l'adresse http://127.0.0.1:8000/admin/ et retournons à http://127.0.0.1:8000/api/v1/users/. Maintenant l'accès est autorisé :) 
+
+Créons un utilisateur régulier *testuser* avec pour mot de passe *AppleAreRed* afin de tester notre installation. Pour ajouter cet utilisateur, il suffit de se rendre à http://127.0.0.1:8000/admin/accounts/customuser/add/, de remplir les champs du nom d'utilisateur et du mot de passe et enfin de sauvegarder. 
+
+Deconnectons-nous afin de faire des tests. 
+
+Dans le fichier `tutorial_project/urls.py`, ajoutons la ligne `path("api-auth/", include("rest_framework.urls")),  # new` :
+
+```
+# django_project/urls.py
+from django.contrib import admin 
+from django.urls import path, include
+
+urlpatterns = [
+    path("admin/", admin.site.urls),
+    path("api/v1/", include("books.urls")),
+    path("api/v1/", include("accounts.urls")),
+    path("api-auth/", include("rest_framework.urls")),  # new
+]
+```
+
+Cette ligne permet d'ajouter un petit bouton **Log-In** et **Log-Out** sur les pages de l'API. 
+
+#### View-Level Permissions
+
+Les permissions au niveau des vues permettent de restreindre l'accès aux endpoints à certains utilisateurs. 
+
+Créons un fichier `books/permissions.py` qui contiendra les permissions d'accès pour les livres :
+
+```
+from rest_framework import permissions
+
+class IsAuthorOrReadOnly(permissions.BasePermission): 
+    def has_permission(self, request, view):
+        # Authenticated users only can see list view
+        if request.user.is_authenticated: 
+            return True
+        return False
+
+    def has_object_permission(self, request, view, obj):
+        # Read permissions are allowed to any request so we'll always # allow GET, HEAD, or OPTIONS requests
+        if request.method in permissions.SAFE_METHODS:
+            return True
+            # Write permissions are only allowed to the author of a post
+        return obj.author == request.user
+```
+
+Dans le fichier `books/views.py`, il est maintenant possible d'ajouter des permissions spécifiques à l'accès des livres : 
+
+```
+# posts/views.py
+from rest_framework import viewsets
+from .permissions import IsAuthorOrReadOnly
+
+from .models import Book
+from .serializers import BookSerializer
+
+class BookViewSet(viewsets.ModelViewSet): 
+    permission_classes = (IsAuthorOrReadOnly,)
+    queryset = Book.objects.all() 
+    serializer_class = BookSerializer
+```
+
+L'accès aux endpoints des utilisateurs est plus restreint puisque seul l'administrateur y a accès `accounts/views.py` :
+
+```
+from django.contrib.auth import get_user_model
+from rest_framework import viewsets
+from rest_framework.permissions import IsAdminUser # new
+from .serializers import UserSerializer 
+
+class UserViewSet(viewsets.ModelViewSet): 
+    permission_classes = [IsAdminUser] # new
+    queryset = get_user_model().objects.all() 
+    serializer_class = UserSerializer
+```
+
+Super ! L'utilisateur régulier *testuser* peut lire la liste des livres, ajouter/modifier/supprimer des livres dans sa propre liste de livres mais il ne peut que lire les livres créés par d'autres utilisateurs. 
+
+Il persiste quelques défaults. Par-exemple, *testuser* peut créer des livres à la place de l'administrateur. Nous modifierons ce comportement par la suite. 
