@@ -2432,3 +2432,236 @@ class UserViewSet(viewsets.ModelViewSet):
 Super ! L'utilisateur régulier *testuser* peut lire la liste des livres, ajouter/modifier/supprimer des livres dans sa propre liste de livres mais il ne peut que lire les livres créés par d'autres utilisateurs. 
 
 Il persiste quelques défaults. Par-exemple, *testuser* peut créer des livres à la place de l'administrateur. Nous modifierons ce comportement par la suite. 
+
+### Authentification
+
+C'est parti : implémentons une authentification par token ! 
+
+`tutorial_project/settings.py` :
+
+```
+INSTALLED_APPS = [
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
+    # 3rd-party apps
+    "rest_framework",  
+    "corsheaders",  
+    "rest_framework.authtoken",  # new
+    # Local
+    "accounts.apps.AccountsConfig", 
+    "books.apps.BooksConfig",
+]
+
+REST_FRAMEWORK = {
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+        ],
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.SessionAuthentication",
+        "rest_framework.authentication.TokenAuthentication",  # new
+    ],
+}
+```
+
+Pas besoin d'installer la librairie via pip car elle fait partie des librairies par défaut de Django. Par contre, nous devons quand même prévenir Django qu'elle sera utilisée via la ligne `"rest_framework.authtoken",  # new`. Profitons-en pour effectuer une migration comme à chaque modification du fichier `settings.py` :
+
+```
+$ ./manage.py makemigrations
+No changes detected
+
+$ ./manage.py migrate
+Operations to perform:
+  Apply all migrations: accounts, admin, auth, authtoken, books, contenttypes, sessions
+Running migrations:
+  Applying authtoken.0001_initial... OK
+  Applying authtoken.0002_auto_20160226_1747... OK
+  Applying authtoken.0003_tokenproxy... OK
+```
+
+Super ;) Si nous nous rendons à la page http://127.0.0.1:8000/admin/authtoken/tokenproxy/, une liste de tokens devrait être affichée ! Pour le moment, cette liste est vide malgré nos deux utilisateurs (admin et testuser). C'est normal, un token de connexion sera généré après la première requête vers l'API. 
+
+#### Endpoints
+
+Nous allons avoir besoin d'endpoints afin d'effectuer des requêtes de connexion, déconnexion, mettre à jour un mot de passe, ... Ces endpoints seront créés en combinant deux librairies **dj-rest-auth** et **django-allauth**. Django-allauth est LA librairie d'authentification de Django. Elle souffre cependant d'une lacune majeure : les endpoints ne sont pas disponibles pour des requêtes faites depuis une origine différente de Django. Comme nous allons utiliser React Native pour effectuer les requêtes, nous devons ajouter la librairie dj-rest-auth qui permet d'ajouter des endpoints accessibles depuis une SPA :)
+
+#### dj-rest-auth
+
+dj-rest-auth nous sera utile pour ajouter les endpoints de log-in, log-out et de réinitialisation du mot de passe. Commençons par installer la librairie :
+
+```
+$ pip install dj-rest-auth
+```
+
+Ensuite, ajoutons la librairie dans `settings.py` :
+
+```
+INSTALLED_APPS = [
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
+    # 3rd-party apps
+    "rest_framework",  
+    "corsheaders",  
+    "rest_framework.authtoken",
+    "dj_rest_auth",  # new
+    # Local
+    "accounts.apps.AccountsConfig", 
+    "books.apps.BooksConfig",
+]
+```
+
+Enfin, modifions `tutorial_project/urls.py` :
+
+```
+# django_project/urls.py
+from django.contrib import admin 
+from django.urls import path, include
+
+urlpatterns = [
+    path("admin/", admin.site.urls),
+    path("api/v1/", include("books.urls")),
+    path("api/v1/", include("accounts.urls")),
+    path("api-auth/", include("rest_framework.urls")),
+    path("api/v1/dj-rest-auth/", include("dj_rest_auth.urls")),  # new
+]
+```
+
+Et voilà :) C'est aussi simple que ça ! Nous avons maintenant de nouveaux endpoints : 
+
+* http://127.0.0.1:8000/api/v1/dj-rest-auth/login/ : log-in de l'utilisateur
+* http://127.0.0.1:8000/api/v1/dj-rest-auth/logout/ : log-out de l'utilisateur
+* http://127.0.0.1:8000/api/v1/dj-rest-auth/password/reset/ : réinitialiser le mot de passe de l'utilisateur
+
+#### django-allauth
+
+Il ne manque qu'un endpoint pour l'inscription d'un nouvel utilisateur. Nous allons utiliser django-allauth qui permet l'inscription classique via email mais aussi via réseaux sociaux comme FaceBook ou Twitter. 
+
+```
+$ pip install django-allauth
+```
+
+Modifions `settings.py` :
+
+```
+INSTALLED_APPS = [
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
+    # 3rd-party apps
+    "rest_framework",  
+    "corsheaders",  
+    "rest_framework.authtoken",
+    "allauth",  # new
+    "allauth.account",  # new
+    "allauth.socialaccount",  # new
+    "dj_rest_auth",  
+    "dj_rest_auth.registration",  # new
+    # Local
+    "accounts.apps.AccountsConfig", 
+    "books.apps.BooksConfig",
+]
+```
+
+ainsi que 
+
+```
+TEMPLATES = [
+    {
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [],
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.debug",
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
+                "django.template.context_processors.request",  # new
+            ],
+        },
+    },
+]
+
+EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"  # new
+
+SITE_ID = 1  # new
+```
+
+Par défaut, django-allauth utilise la variable `EMAIL_BACKEND` pour la confirmation de l'adresse email d'un nouvel utilisateur. Plutôt que d'envoyer un email de confirmation, nous allons afficher un message de confirmation dans la console. 
+
+Effectuons les migrations : 
+
+```
+$ python manage.py migrate
+```
+
+et ajoutons une nouvelle URL dans `urls.py` :
+
+```
+# django_project/urls.py
+from django.contrib import admin 
+from django.urls import path, include
+
+urlpatterns = [
+    path("admin/", admin.site.urls),
+    path("api/v1/", include("books.urls")),
+    path("api/v1/", include("accounts.urls")),
+    path("api-auth/", include("rest_framework.urls")),
+    path("api/v1/dj-rest-auth/", include("dj_rest_auth.urls")),
+    path("api/v1/dj-rest-auth/registration/", include("dj_rest_auth.registration.urls")),   # new
+]
+```
+
+Excellent :) Créons un nouvel utilisateur pour être certain que tout fonctionne ! L'URL http://127.0.0.1:8000/api/v1/dj-rest-auth/registration/ permet d'enregistrer un nouvel utilisateur. Créons-en un avec comme :
+
+* username : tigrou
+* email : tigrou@email.com
+* password : AppleAreRed
+
+La réponse est du serveur est :
+
+    [27/Dec/2022 12:48:47] "GET /api/v1/dj-rest-auth/registration/ HTTP/1.1" 405 8209
+    Content-Type: text/plain; charset="utf-8"
+    MIME-Version: 1.0
+    Content-Transfer-Encoding: 7bit
+    Subject: [127.0.0.1:8000] Please Confirm Your E-mail Address
+    From: webmaster@localhost
+    To: tigrou@email.com
+    Date: Tue, 27 Dec 2022 12:51:43 -0000
+    Message-ID: <167214550307.15895.7235737074843607062@MacBook-Pro.local>
+
+    Hello from 127.0.0.1:8000!
+
+    You're receiving this e-mail because user tigrou has given your e-mail address to register an account on 127.0.0.1:8000.
+
+    To confirm this is correct, go to http://127.0.0.1:8000/api/v1/dj-rest-auth/registration/account-confirm-email/MQ:1pA9Ql:jW9uxq-K6vKf8GX0RY_nZ4SgShiZ2aDNgL03nahI-uI/
+
+    Thank you for using 127.0.0.1:8000!
+    127.0.0.1:8000
+    -------------------------------------------------------------------------------
+    [27/Dec/2022 12:51:43] "POST /api/v1/dj-rest-auth/registration/ HTTP/1.1" 201 7501
+
+et la réponse de l'API :
+
+```
+HTTP 201 Created
+Allow: POST, OPTIONS
+Content-Type: application/json
+Vary: Accept
+
+{
+    "key": "444643f6a7921956a458567f8ec733120f640402"
+}
+```
+
+Afin de voir le token, il suffit de se rendre à l'adresse http://127.0.0.1:8000/admin/ comme    administrateur. Tadam !! http://127.0.0.1:8000/admin/authtoken/tokenproxy/ contient un token pour *tigrou*. Ce token devra être stocké par le front-end et renvoyé à chaque requête vers l'API :) 
