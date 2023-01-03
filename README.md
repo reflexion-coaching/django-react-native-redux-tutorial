@@ -2665,3 +2665,725 @@ Vary: Accept
 ```
 
 Afin de voir le token, il suffit de se rendre à l'adresse http://127.0.0.1:8000/admin/ comme    administrateur. Tadam !! http://127.0.0.1:8000/admin/authtoken/tokenproxy/ contient un token pour *tigrou*. Ce token devra être stocké par le front-end et renvoyé à chaque requête vers l'API :) 
+
+Nous pouvons néanmoins utiliser *curl* pour visualiser l'apparence de notre requête. Précédemment la requête était :
+
+```
+$ curl -X GET http://127.0.0.1:8000/api/v1/books/
+{"detail":"Authentication credentials were not provided."}% 
+```
+
+```
+$ curl -H "Authorization: Token 444643f6a7921956a458567f8ec733120f640402" -X GET http://127.0.0.1:8000/api/v1/books/
+
+[{"id":110,"author":1,"title":"Blabla","created_at":"2022-12-26T15:24:02.915728Z"},{"id":111,"author":1,"title":"Blabla","created_at":"2022-12-26T15:24:15.337840Z"},{"id":112,"author":2,"title":"Okay","created_at":"2022-12-26T15:24:27.083463Z"},{"id":113,"author":1,"title":"Check","created_at":"2022-12-26T15:27:15.306440Z"},{"id":114,"author":3,"title":"Nouveau Titre","created_at":"2022-12-27T13:21:14.149753Z"}]% 
+```
+
+Parfait :D Passons maintenant à React Native !
+
+## React Native : Permissions et Authentification
+
+Commençons par un petit test : actuellement, la liste des livres n'est plus affichée. C'est normal : les endpoints ne sont pas disponibles à moins d'être authentifié. Ajoutons donc le token de l'utilisateur tigrou aux **headers** des requêtes. Dans le fichier `ssrc/features/api/bookSlice.js`, ajoutons le `prepareHeaders` :
+
+```
+import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
+
+export const bookApi = createApi({
+  reducerPath: 'bookApi',
+  baseQuery: fetchBaseQuery({ 
+    baseUrl: 'http://localhost:8000/api/v1/', // 192.168.1.20 et 10.0.2.2:8000
+    prepareHeaders: (headers, { getState }) => {
+      
+      //const token = getState().auth.token
+      const token = '444643f6a7921956a458567f8ec733120f640402'
+  
+      if (token) {
+        headers.set('authorization', `Token ${token}`)
+      } else {
+        headers.set('authorization', `Token 444643f6a7921956a458567f8ec733120f640402`)
+      }
+  
+      return headers
+    },
+   }), 
+  tagTypes: ['Book'],
+  endpoints: builder => ({
+    getListOfBooks: builder.query({
+      query: () => `books/`,
+      providesTags: ['Book']
+    }),
+    addNewBook: builder.mutation({
+      query: initialBook => ({
+        url: 'books/',
+        method: 'POST',
+        body: initialBook
+      }),
+      invalidatesTags: ['Book']
+    }),
+    deleteBook: builder.mutation({
+      query: (id) => ({
+        url: `/books/${id}/`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['Book'],
+    }),
+    updateBook: builder.mutation({
+      query(data) {
+        const { id, ...body } = data
+        return {
+          url: `books/${id}/`,
+          method: 'PUT',
+          body,
+        }
+      },
+      invalidatesTags: ['Book'],
+    }),
+  })
+})
+
+export const { useGetListOfBooksQuery, useAddNewBookMutation, useDeleteBookMutation, useUpdateBookMutation } = bookApi
+```
+
+Parfait, la liste des livres s'affichent à nouveau. Nous pouvons également créer et modifier les livres appartenant à *tigrou* mais plus aux autres utilisateurs. 
+
+### Expo-secure-store
+
+Seulement, écrire en clair le token d'un utilisateur n'est pas recommandé au niveau de la sécurité. A la place, nous pouvons utiliser **expo-secure-store**. Le secure-store d'Expo encrypte et stocke des paires de valeurs (clé - valeur) sur la machine de l'utilisateur. Pour l'installer, lançons la commande :
+
+```
+$ npx expo install expo-secure-store
+```
+
+Bien, nous allons modifier le bouton "Sign-Up" pour qu'il enregistre le token dans le secure-store. Pour le moment, le token sera passé en clair au secure-store. Un peu plus tard, il sera directement enregistré depuis la réponse de l'API. Modifions le fichier `SignUp.js` en y ajoutant la fonction `save` :
+
+```
+import React from 'react';
+import { Text, View, Button, StyleSheet, TextInput } from 'react-native';
+import { Formik } from 'formik';
+import * as Yup from 'yup';
+import { useNavigation } from '@react-navigation/native';
+import * as SecureStore from 'expo-secure-store';
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        padding: 10,
+        marginTop: 20,
+    },
+    inputStyle: {
+        borderWidth: 1,
+        borderColor: '#4e4e4e',
+        padding: 12,
+        marginBottom: 12,
+        textAlign: 'center',
+        fontSize: 18,
+    },
+    inputLablel: {
+        paddingTop: 10,
+        fontSize: 18,
+        height: 44,
+        fontWeight: "bold",
+    }
+});
+
+
+function SignUp() {
+
+    const navigation = useNavigation();
+
+    async function save(key, value, navigation) {
+        await SecureStore.setItemAsync(key, value);
+        navigation.navigate('Home')
+    }
+
+    const SignUpForm = props => (
+        <Formik
+            initialValues={{
+                username: "Pierre",
+                email: "pierre@email.com",
+                password: "password"
+            }}
+            onSubmit={() => save('token', '444643f6a7921956a458567f8ec733120f640402', navigation)}
+            validationSchema={Yup.object({
+                username: Yup
+                    .string()
+                    .min(3, 'Must be 3 characters or less')
+                    .required('Required'),
+                password: Yup
+                    .string()
+                    .min(3, 'Must be 3 characters or less')
+                    .required('Required')
+            })}
+        >
+            {({ handleChange,
+                handleBlur,
+                handleSubmit,
+                values,
+                errors,
+                touched,
+                isValid, }) => (
+                <View>
+                    <Text style={styles.inputLablel}>Username :</Text>
+                    <TextInput
+                        name="username"
+                        placeholder='username'
+                        onChangeText={handleChange('username')}
+                        onBlur={handleBlur('username')}
+                        value={values.username}
+                        style={styles.inputStyle}
+                    />
+                    {touched.username && errors.username &&
+                        <Text style={{ fontSize: 16, color: '#FF0D10' }}>{errors.username}</Text>
+                    }
+                    <Text style={styles.inputLablel}>Password :</Text>
+                    <TextInput
+                        name="password"
+                        placeholder='password'
+                        onChangeText={handleChange('password')}
+                        onBlur={handleBlur('password')}
+                        value={values.password}
+                        style={styles.inputStyle}
+                    />
+                    {touched.password && errors.password &&
+                        <Text style={{ fontSize: 16, color: '#FF0D10' }}>{errors.password}</Text>
+                    }
+                    <View style={{ paddingTop: 20 }}>
+                    <Button onPress={handleSubmit} title="Sign Up" color="#6495ed"/>
+                    </View>
+                </View>
+            )}
+        </Formik>
+    );
+
+    return (
+        <View style={styles.container}>
+            <SignUpForm />
+        </View>
+    )
+}
+
+export default SignUp;
+```
+
+La fonction `save` ajoute le token dans le secure store à la clé "token". Bien maintenant, modifions `bookSlice.js` pour que l'en-tête soit complétée avec le token extrait du secure-store d'Expo :
+
+```
+import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
+import * as SecureStore from 'expo-secure-store';
+
+export const bookApi = createApi({
+  reducerPath: 'bookApi',
+  baseQuery: fetchBaseQuery({ 
+    baseUrl: 'http://localhost:8000/api/v1/', // 192.168.1.20 et 10.0.2.2:8000
+    prepareHeaders: async (headers) => {
+      const token = await SecureStore.getItemAsync('token');
+      if (token) {
+        headers.set('authorization', `Token ${token}`)
+      } else {
+        console.log("mince, petite erreur !")
+      }
+      return headers
+    },
+   }), 
+  tagTypes: ['Book'],
+  endpoints: builder => ({
+    getListOfBooks: builder.query({
+      query: () => `books/`,
+      providesTags: ['Book']
+    }),
+    addNewBook: builder.mutation({
+      query: initialBook => ({
+        url: 'books/',
+        method: 'POST',
+        body: initialBook
+      }),
+      invalidatesTags: ['Book']
+    }),
+    deleteBook: builder.mutation({
+      query: (id) => ({
+        url: `/books/${id}/`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['Book'],
+    }),
+    updateBook: builder.mutation({
+      query(data) {
+        const { id, ...body } = data
+        return {
+          url: `books/${id}/`,
+          method: 'PUT',
+          body,
+        }
+      },
+      invalidatesTags: ['Book'],
+    }),
+  })
+})
+
+export const { useGetListOfBooksQuery, useAddNewBookMutation, useDeleteBookMutation, useUpdateBookMutation } = bookApi
+```
+
+Excellent ! Le token est stocké dans secure-store :) Attaquons-nous au problème du token écrit en claire. L'url http://127.0.0.1:8000/api/v1/dj-rest-auth/login/ renvoie le token de l'utilisateur lorsque ce dernier se connecte via mot de passe. Ajoutons cette url à la liste des endpoints de `bookSlice.js` :
+
+```
+import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
+import * as SecureStore from 'expo-secure-store';
+
+export const bookApi = createApi({
+  reducerPath: 'bookApi',
+  baseQuery: fetchBaseQuery({ 
+    baseUrl: 'http://localhost:8000/api/v1/', // 192.168.1.20 et 10.0.2.2:8000
+    prepareHeaders: async (headers) => {
+      const token = await SecureStore.getItemAsync('token');
+      if (token) {
+        headers.set('authorization', `Token ${token}`)
+      } else {
+        alert("mince, petite erreur !")
+      }
+      return headers
+    },
+   }), 
+  tagTypes: ['Book'],
+  endpoints: builder => ({
+    getListOfBooks: builder.query({
+      query: () => `books/`,
+      providesTags: ['Book']
+    }),
+    addNewBook: builder.mutation({
+      query: initialBook => ({
+        url: 'books/',
+        method: 'POST',
+        body: initialBook
+      }),
+      invalidatesTags: ['Book']
+    }),
+    deleteBook: builder.mutation({
+      query: (id) => ({
+        url: `/books/${id}/`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['Book'],
+    }),
+    updateBook: builder.mutation({
+      query(data) {
+        const { id, ...body } = data
+        return {
+          url: `books/${id}/`,
+          method: 'PUT',
+          body,
+        }
+      },
+      invalidatesTags: ['Book'], // ne recharger que le livre modifié
+    }),
+    logIn: builder.mutation ({
+      query(creditentials) {
+        return {
+          url: `dj-rest-auth/login/`,
+          method: 'POST',
+          body: creditentials,
+        }
+      },
+      transformResponse: async (response, meta, arg) => {
+        await SecureStore.setItemAsync('token', response.key);
+      },
+    }),
+  })
+})
+
+export const { useGetListOfBooksQuery, useAddNewBookMutation, 
+  useDeleteBookMutation, useUpdateBookMutation,
+  useLogInMutation } = bookApi
+```
+
+Ensuite dans le fichier `SignUp.js` :
+
+```
+import React from 'react';
+import { Text, View, Button, StyleSheet, TextInput } from 'react-native';
+import { Formik } from 'formik';
+import * as Yup from 'yup';
+import { useNavigation } from '@react-navigation/native';
+import { useLogInMutation } from '../api/bookSlice'
+
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        padding: 10,
+        marginTop: 20,
+    },
+    inputStyle: {
+        borderWidth: 1,
+        borderColor: '#4e4e4e',
+        padding: 12,
+        marginBottom: 12,
+        textAlign: 'center',
+        fontSize: 18,
+    },
+    inputLablel: {
+        paddingTop: 10,
+        fontSize: 18,
+        height: 44,
+        fontWeight: "bold",
+    }
+});
+
+
+function SignUp() {
+
+    const navigation = useNavigation();
+    const [logIn, { isLoading }] = useLogInMutation() // ajouter error
+
+    function save(values, navigation) {
+        logIn({'username': 'tigrou', 'password': values.password})
+        .unwrap()
+        .then(() => {
+            console.log('fulfilled')
+            navigation.navigate('Home')
+        })
+        .catch((error) => {
+            console.log('oh nooooo !!! rejected', error.status, error.data, error.message)})
+    }
+
+    const SignUpForm = props => (
+        <Formik
+            initialValues={{
+                username: "Pierre",
+                email: "pierre@email.com",
+                password: "password"
+            }}
+            onSubmit={values => save(values, navigation)}
+            validationSchema={Yup.object({
+                username: Yup
+                    .string()
+                    .min(3, 'Must be 3 characters or less')
+                    .required('Required'),
+                password: Yup
+                    .string()
+                    .min(3, 'Must be 3 characters or less')
+                    .required('Required')
+            })}
+        >
+            {({ handleChange,
+                handleBlur,
+                handleSubmit,
+                values,
+                errors,
+                touched,
+                isValid, }) => (
+                <View>
+                    <Text style={styles.inputLablel}>Username :</Text>
+                    <TextInput
+                        name="username"
+                        placeholder='username'
+                        onChangeText={handleChange('username')}
+                        onBlur={handleBlur('username')}
+                        value={values.username}
+                        style={styles.inputStyle}
+                    />
+                    {touched.username && errors.username &&
+                        <Text style={{ fontSize: 16, color: '#FF0D10' }}>{errors.username}</Text>
+                    }
+                    <Text style={styles.inputLablel}>Password :</Text>
+                    <TextInput
+                        name="password"
+                        placeholder='password'
+                        onChangeText={handleChange('password')}
+                        onBlur={handleBlur('password')}
+                        value={values.password}
+                        style={styles.inputStyle}
+                    />
+                    {touched.password && errors.password &&
+                        <Text style={{ fontSize: 16, color: '#FF0D10' }}>{errors.password}</Text>
+                    }
+                    <View style={{ paddingTop: 20 }}>
+                    <Button onPress={handleSubmit} title="Sign Up" color="#6495ed"/>
+                    </View>
+                </View>
+            )}
+        </Formik>
+    );
+
+    return (
+        <View style={styles.container}>
+            <SignUpForm />
+        </View>
+    )
+}
+
+export default SignUp;
+```
+
+et aussi `SignUpScreen.js` :
+
+```
+import SignUp from '../features/authentification/SignUp';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+const SignUpScreen = () => {
+  return (
+    <SafeAreaView style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+      <SignUp />
+    </SafeAreaView>
+  )
+}
+
+export default SignUpScreen;
+```
+
+Pour que tout fonctionne, il faut enlever une ligne `"rest_framework.authentication.SessionAuthentication"` dans `settings.py` :
+
+```
+REST_FRAMEWORK = {
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+        ],
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        #"rest_framework.authentication.SessionAuthentication",
+        "rest_framework.authentication.TokenAuthentication",  # new
+    ],
+}
+```
+
+Excellent ! Maintenant si on remplit le mot de passe avec **AppleAreRed**, le token sera stocké dans le secure store de Expo :) 
+
+Nous pouvons faire pareil avec l'enregistrement de nouvel utilisateur. C'est parti, modifions `SignIn.js` :
+
+```
+import React from 'react';
+import { Text, View, Button, StyleSheet, TextInput } from 'react-native';
+import { Formik } from 'formik';
+import * as Yup from 'yup';
+import { useNavigation } from '@react-navigation/native';
+import { useRegistrationMutation } from '../api/bookSlice'
+
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        padding: 10,
+        marginTop: 20,
+    },
+    inputStyle: {
+        borderWidth: 1,
+        borderColor: '#4e4e4e',
+        padding: 12,
+        marginBottom: 12,
+        textAlign: 'center',
+        fontSize: 18,
+    },
+    inputLablel: {
+        paddingTop: 10,
+        fontSize: 18,
+        height: 44,
+        fontWeight: "bold",
+    }
+});
+
+
+function SignIn() {
+
+    const navigation = useNavigation();
+
+    const [Registration, { isLoading }] = useRegistrationMutation() 
+
+    function save(values, navigation) {
+        Registration({'username': values.username, 'email': values.email, 'password1': values.password, 'password2': values.password})
+        .unwrap()
+        .then(() => {
+            console.log('fulfilled')
+            navigation.navigate('Home')
+        })
+        .catch((error) => {
+            console.log('oh nooooo !!! rejected', error.status, error.data, error.message)})
+    }
+
+    const SignInForm = props => (
+        <Formik
+            initialValues={{
+                username: "Pierre",
+                email: "pierre@email.com",
+                password: "password"
+            }}
+            onSubmit={values => save(values, navigation)}
+            validationSchema={Yup.object({
+                username: Yup
+                    .string()
+                    .min(3, 'Must be 3 characters or less')
+                    .required('Required'),
+                email: Yup
+                    .string()
+                    .email("email is not valid")
+                    .required('Required'),
+                password: Yup
+                    .string()
+                    .min(3, 'Must be 3 characters or less')
+                    .required('Required')
+            })}
+        >
+            {({ handleChange,
+                handleBlur,
+                handleSubmit,
+                values,
+                errors,
+                touched,
+                isValid, }) => (
+                <View>
+                    <Text style={styles.inputLablel}>Username :</Text>
+                    <TextInput
+                        name="username"
+                        placeholder='username'
+                        onChangeText={handleChange('username')}
+                        onBlur={handleBlur('username')}
+                        value={values.username}
+                        style={styles.inputStyle}
+                    />
+                    {touched.username && errors.username &&
+                        <Text style={{ fontSize: 16, color: '#FF0D10' }}>{errors.username}</Text>
+                    }
+                    <Text style={styles.inputLablel}>Email :</Text>
+                    <TextInput
+                        name="email"
+                        placeholder='email'
+                        onChangeText={handleChange('email')}
+                        onBlur={handleBlur('email')}
+                        value={values.email}
+                        style={styles.inputStyle}
+                    />
+                    {touched.email && errors.email &&
+                        <Text style={{ fontSize: 16, color: '#FF0D10' }}>{errors.email}</Text>
+                    }
+                    <Text style={styles.inputLablel}>Password :</Text>
+                    <TextInput
+                        name="password"
+                        placeholder='password'
+                        onChangeText={handleChange('password')}
+                        onBlur={handleBlur('password')}
+                        value={values.password}
+                        style={styles.inputStyle}
+                    />
+                    {touched.password && errors.password &&
+                        <Text style={{ fontSize: 16, color: '#FF0D10' }}>{errors.password}</Text>
+                    }
+                    <View style={{ paddingTop: 20 }}>
+                    <Button onPress={handleSubmit} title="Sign In" color="#6495ed"/>
+                    </View>
+                </View>
+            )}
+        </Formik>
+    );
+
+    return (
+        <View style={styles.container}>
+            <SignInForm />
+        </View>
+    )
+}
+
+export default SignIn;
+```
+
+Ensuite, modifions `SignInScreen.js` :
+
+```
+import SignIn from '../features/authentification/SignIn';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+const SignInScreen = () => {
+  return (
+    <SafeAreaView style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+      <SignIn />
+    </SafeAreaView>
+  )
+}
+
+export default SignInScreen;
+```
+
+Et enfin `bookSlice.js` :
+
+```
+import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
+import * as SecureStore from 'expo-secure-store';
+
+export const bookApi = createApi({
+  reducerPath: 'bookApi',
+  baseQuery: fetchBaseQuery({ 
+    baseUrl: 'http://localhost:8000/api/v1/', // 192.168.1.20 et 10.0.2.2:8000
+    prepareHeaders: async (headers) => {
+      const token = await SecureStore.getItemAsync('token');
+      if (token) {
+        headers.set('authorization', `Token ${token}`)
+      } else {
+        alert("mince, petite erreur !")
+      }
+      return headers
+    },
+   }), 
+  tagTypes: ['Book'],
+  endpoints: builder => ({
+    getListOfBooks: builder.query({
+      query: () => `books/`,
+      providesTags: ['Book']
+    }),
+    addNewBook: builder.mutation({
+      query: initialBook => ({
+        url: 'books/',
+        method: 'POST',
+        body: initialBook
+      }),
+      invalidatesTags: ['Book']
+    }),
+    deleteBook: builder.mutation({
+      query: (id) => ({
+        url: `/books/${id}/`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['Book'],
+    }),
+    updateBook: builder.mutation({
+      query(data) {
+        const { id, ...body } = data
+        return {
+          url: `books/${id}/`,
+          method: 'PUT',
+          body,
+        }
+      },
+      invalidatesTags: ['Book'], // ne recharger que le livre modifié
+    }),
+    logIn: builder.mutation ({
+      query(creditentials) {
+        return {
+          url: `dj-rest-auth/login/`,
+          method: 'POST',
+          body: creditentials,
+        }
+      },
+      transformResponse: async (response, meta, arg) => {
+        await SecureStore.setItemAsync('token', response.key);
+      },
+    }),
+    registration: builder.mutation ({
+      query(creditentials) {
+        return {
+          url: `dj-rest-auth/registration/`,
+          method: 'POST',
+          body: creditentials,
+        }
+      },
+      transformResponse: async (response, meta, arg) => {
+        await SecureStore.setItemAsync('token', response.key);
+      },
+    }),
+  })
+})
+
+export const { useGetListOfBooksQuery, useAddNewBookMutation, 
+  useDeleteBookMutation, useUpdateBookMutation,
+  useLogInMutation, useRegistrationMutation } = bookApi
+```
+
+CQFD ! Nous pouvons enregistrer n'importe quel utilisateur :D
+
+Voyons maintenant comment faire pour déconnecter un utilisateur. 

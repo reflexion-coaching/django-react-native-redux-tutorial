@@ -1,5 +1,6 @@
 import { Text, Button, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useLogOutMutation } from '../api/bookSlice'
 
 const styles = StyleSheet.create({
     container: {
@@ -16,10 +17,20 @@ const styles = StyleSheet.create({
 });
 
 const Welcome = ({ navigation }) => {
+
+    const [logOut, { isLoading }] = useLogOutMutation() // ajouter error
+
     return (
         <SafeAreaView style={styles.container}>
             <Text style={styles.textStyle}>Welcome Screen</Text>
             <View style={{ flexDirection: 'row' }}>
+                <View style={{ padding: 5 }}>
+                    <Button
+                        title="Go to Sign-In"
+                        onPress={() => navigation.navigate('Sign-In')}
+                        color="#6495ed"
+                    />
+                </View>
                 <View style={{ padding: 5 }}>
                     <Button
                         title="Go to Sign-Up"
@@ -29,8 +40,8 @@ const Welcome = ({ navigation }) => {
                 </View>
                 <View style={{ padding: 5 }}>
                     <Button
-                        title="Go to Sign-In"
-                        onPress={() => navigation.navigate('Sign-In')}
+                        title="Log-out"
+                        onPress={() => logOut()}
                         color="#6495ed"
                     />
                 </View>

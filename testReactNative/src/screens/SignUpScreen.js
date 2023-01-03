@@ -1,4 +1,4 @@
-import { SignUp } from '../features/authentification/SignUp';
+import SignUp from '../features/authentification/SignUp';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const SignUpScreen = () => {

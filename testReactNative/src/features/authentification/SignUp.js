@@ -3,6 +3,8 @@ import { Text, View, Button, StyleSheet, TextInput } from 'react-native';
 import { Formik } from 'formik';
 import * as Yup from 'yup';
 import { useNavigation } from '@react-navigation/native';
+import { useLogInMutation } from '../api/bookSlice'
+
 
 const styles = StyleSheet.create({
     container: {
@@ -27,9 +29,21 @@ const styles = StyleSheet.create({
 });
 
 
-export const SignUp = () => {
+function SignUp() {
 
     const navigation = useNavigation();
+    const [logIn, { isLoading }] = useLogInMutation() // ajouter error
+
+    function save(values, navigation) {
+        logIn({'username': 'tigrou', 'password': values.password})
+        .unwrap()
+        .then(() => {
+            console.log('fulfilled')
+            navigation.navigate('Home')
+        })
+        .catch((error) => {
+            console.log('oh nooooo !!! rejected', error.status, error.data, error.message)})
+    }
 
     const SignUpForm = props => (
         <Formik
@@ -38,7 +52,7 @@ export const SignUp = () => {
                 email: "pierre@email.com",
                 password: "password"
             }}
-            onSubmit={() => navigation.navigate('Home')}
+            onSubmit={values => save(values, navigation)}
             validationSchema={Yup.object({
                 username: Yup
                     .string()
@@ -96,3 +110,5 @@ export const SignUp = () => {
         </View>
     )
 }
+
+export default SignUp;
