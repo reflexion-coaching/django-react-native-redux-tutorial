@@ -3,7 +3,7 @@ import { Formik } from 'formik';
 import * as Yup from 'yup';
 import { useNavigation } from '@react-navigation/native';
 import { useLogInMutation } from '../api/bookSlice'
-import { useSelector, useDispatch } from 'react-redux';
+import { useDispatch } from 'react-redux';
 import { signedIn } from '../api/authentificationSlice'
 
 
@@ -42,7 +42,6 @@ function SignUp() {
         .then(() => {
             console.log('fulfilled')
             dispatch(signedIn(true))
-            navigation.navigate('Home')
         })
         .catch((error) => {
             console.log('oh nooooo !!! rejected', error.status, error.data, error.message)})

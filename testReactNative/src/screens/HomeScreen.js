@@ -1,5 +1,9 @@
-import { Text, Button, StyleSheet } from 'react-native';
+import { Text, Button, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useLogOutMutation } from '../features/api/bookSlice';
+import { useDispatch } from 'react-redux';
+import { signedIn } from '../features/api/authentificationSlice'
+
 
 const styles = StyleSheet.create({
     container: {
@@ -16,6 +20,22 @@ const styles = StyleSheet.create({
 });
 
 const HomeScreen = ({ navigation }) => {
+
+    const dispatch = useDispatch();
+    const [logOut, { isLoading }] = useLogOutMutation() // ajouter error
+
+    function loggingOut() {
+        logOut()
+            .unwrap()
+            .then(() => {
+                dispatch(signedIn(false))
+                alert('Log Out Okay :)')
+            })
+            .catch((error) => {
+                alert('Log Out Failed :(', error)
+            })
+    }
+
     return (
         <SafeAreaView style={styles.container}>
             <Text style={styles.textStyle}>Home Screen</Text>
@@ -24,6 +44,13 @@ const HomeScreen = ({ navigation }) => {
                 onPress={() => navigation.navigate('Books')}
                 color="#6495ed"
             />
+            <View style={{ padding: 5 }}>
+                <Button
+                    title="Log-Out"
+                    onPress={() => loggingOut()}
+                    color="#6495ed"
+                />
+            </View>
         </SafeAreaView>
     );
 }

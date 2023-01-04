@@ -3,7 +3,9 @@ import { Text, View, Button, StyleSheet, TextInput } from 'react-native';
 import { Formik } from 'formik';
 import * as Yup from 'yup';
 import { useNavigation } from '@react-navigation/native';
-import { useRegistrationMutation } from '../api/bookSlice'
+import { useRegistrationMutation } from '../api/bookSlice';
+import { useDispatch } from 'react-redux';
+import { signedIn } from '../api/authentificationSlice'
 
 
 const styles = StyleSheet.create({
@@ -32,7 +34,7 @@ const styles = StyleSheet.create({
 function SignIn() {
 
     const navigation = useNavigation();
-
+    const dispatch = useDispatch();
     const [Registration, { isLoading }] = useRegistrationMutation() 
 
     function save(values, navigation) {
@@ -40,7 +42,7 @@ function SignIn() {
         .unwrap()
         .then(() => {
             console.log('fulfilled')
-            navigation.navigate('Home')
+            dispatch(signedIn(true))
         })
         .catch((error) => {
             console.log('oh nooooo !!! rejected', error.status, error.data, error.message)
