@@ -1,6 +1,7 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
 import * as SecureStore from 'expo-secure-store';
 
+
 export const bookApi = createApi({
   reducerPath: 'bookApi',
   baseQuery: fetchBaseQuery({ 
@@ -10,7 +11,7 @@ export const bookApi = createApi({
       if (token) {
         headers.set('authorization', `Token ${token}`)
       } else {
-        alert("mince, petite erreur !")
+        console.log("mince, petite erreur !")
       }
       return headers
     },
@@ -78,7 +79,10 @@ export const bookApi = createApi({
           method: 'POST',
           body: creditentials,
         }
-      }
+      },
+      transformResponse: async (response, meta, arg) => {
+        await SecureStore.deleteItemAsync('token');
+      },
     }),
   })
 })

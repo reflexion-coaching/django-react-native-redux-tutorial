@@ -43,7 +43,8 @@ function SignIn() {
             navigation.navigate('Home')
         })
         .catch((error) => {
-            console.log('oh nooooo !!! rejected', error.status, error.data, error.message)})
+            console.log('oh nooooo !!! rejected', error.status, error.data, error.message)
+        })
     }
 
     const SignInForm = props => (

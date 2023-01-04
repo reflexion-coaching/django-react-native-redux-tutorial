@@ -3386,4 +3386,173 @@ export const { useGetListOfBooksQuery, useAddNewBookMutation,
 
 CQFD ! Nous pouvons enregistrer n'importe quel utilisateur :D
 
-Voyons maintenant comment faire pour déconnecter un utilisateur. 
+Voyons maintenant comment faire pour déconnecter un utilisateur. dj-rest-auth propose le endpoint *http://127.0.0.1:8000/api/v1/dj-rest-auth/logout/*. Une méthode POST vers cette URL supprime le token de l'utilisateur qui envoie la requête de la base de données. Implémentons là dans `bookSlice.js` :
+
+```
+import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
+import * as SecureStore from 'expo-secure-store';
+
+export const bookApi = createApi({
+  reducerPath: 'bookApi',
+  baseQuery: fetchBaseQuery({ 
+    baseUrl: 'http://localhost:8000/api/v1/', // 192.168.1.20 et 10.0.2.2:8000
+    prepareHeaders: async (headers) => {
+      const token = await SecureStore.getItemAsync('token');
+      if (token) {
+        headers.set('authorization', `Token ${token}`)
+      } else {
+        console.log("mince, petite erreur !")
+      }
+      return headers
+    },
+   }), 
+  tagTypes: ['Book'],
+  endpoints: builder => ({
+    getListOfBooks: builder.query({
+      query: () => `books/`,
+      providesTags: ['Book']
+    }),
+    addNewBook: builder.mutation({
+      query: initialBook => ({
+        url: 'books/',
+        method: 'POST',
+        body: initialBook
+      }),
+      invalidatesTags: ['Book']
+    }),
+    deleteBook: builder.mutation({
+      query: (id) => ({
+        url: `/books/${id}/`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['Book'],
+    }),
+    updateBook: builder.mutation({
+      query(data) {
+        const { id, ...body } = data
+        return {
+          url: `books/${id}/`,
+          method: 'PUT',
+          body,
+        }
+      },
+      invalidatesTags: ['Book'], // ne recharger que le livre modifié
+    }),
+    logIn: builder.mutation ({
+      query(creditentials) {
+        return {
+          url: `dj-rest-auth/login/`,
+          method: 'POST',
+          body: creditentials,
+        }
+      },
+      transformResponse: async (response, meta, arg) => {
+        await SecureStore.setItemAsync('token', response.key);
+      },
+    }),
+    registration: builder.mutation ({
+      query(creditentials) {
+        return {
+          url: `dj-rest-auth/registration/`,
+          method: 'POST',
+          body: creditentials,
+        }
+      },
+      transformResponse: async (response, meta, arg) => {
+        await SecureStore.setItemAsync('token', response.key);
+      },
+    }),
+    logOut: builder.mutation ({
+      query(creditentials) {
+        return {
+          url: `dj-rest-auth/logout/`,
+          method: 'POST',
+          body: creditentials,
+        }
+      },
+      transformResponse: async (response, meta, arg) => {
+        await SecureStore.deleteItemAsync('token');
+      },
+    }),
+  })
+})
+
+export const { useGetListOfBooksQuery, useAddNewBookMutation, 
+  useDeleteBookMutation, useUpdateBookMutation,
+  useLogInMutation, useRegistrationMutation,
+  useLogOutMutation } = bookApi
+```
+
+`await SecureStore.deleteItemAsync('token');` supprime le token de l'utilisateur du secure store si la réponse du serveur est positive. Bien maintenant implémentons la méthode dans le fichier `Welcome.js` :
+
+```
+import { Text, Button, StyleSheet, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useLogOutMutation } from '../api/bookSlice'
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 10,
+    },
+    textStyle: {
+        fontSize: 36,
+        fontWeight: "bold",
+        marginBottom: 10
+    }
+});
+
+const Welcome = ({ navigation }) => {
+
+    const [logOut, { isLoading }] = useLogOutMutation() // ajouter error
+
+    function loggingOut() {
+        logOut()
+        .unwrap()
+        .then(() => {
+            alert('Log Out Okay :)')
+        })
+        .catch((error) => {
+            alert('Log Out Failed :(', error)
+        })
+    }
+
+    return (
+        <SafeAreaView style={styles.container}>
+            <Text style={styles.textStyle}>Welcome Screen</Text>
+            <View >
+                <View style={{ padding: 5 }}>
+                    <Button
+                        title="Go to Sign-In"
+                        onPress={() => navigation.navigate('Sign-In')}
+                        color="#6495ed"
+                    />
+                </View>
+                <View style={{ padding: 5 }}>
+                    <Button
+                        title="Go to Sign-Up"
+                        onPress={() => navigation.navigate('Sign-Up')}
+                        color="#6495ed"
+                    />
+                </View>
+                <View style={{ padding: 5 }}>
+                    <Button
+                        title="Log-Out"
+                        onPress={() => loggingOut()}
+                        color="#6495ed"
+                    />
+                </View>
+            </View>
+        </SafeAreaView>
+    );
+}
+
+export default Welcome;
+```
+
+CQFD :) Une fois que le bouton `Log-Out` est cliqué, le token est supprimé et toutes les requêtes futures échoueront. 
+
+Il reste assez peu de features à mettre en place pour que l'application ressemble à une application réelle. Il pourrait être intéressant d'interdire l'accès aux écrans **Home** et **Books** si l'utilisateur n'est pas connecté. 

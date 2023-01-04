@@ -1,9 +1,10 @@
-import React from 'react';
 import { Text, View, Button, StyleSheet, TextInput } from 'react-native';
 import { Formik } from 'formik';
 import * as Yup from 'yup';
 import { useNavigation } from '@react-navigation/native';
 import { useLogInMutation } from '../api/bookSlice'
+import { useSelector, useDispatch } from 'react-redux';
+import { signedIn } from '../api/authentificationSlice'
 
 
 const styles = StyleSheet.create({
@@ -32,13 +33,15 @@ const styles = StyleSheet.create({
 function SignUp() {
 
     const navigation = useNavigation();
+    const dispatch = useDispatch();
     const [logIn, { isLoading }] = useLogInMutation() // ajouter error
 
     function save(values, navigation) {
-        logIn({'username': 'tigrou', 'password': values.password})
+        logIn({'username': values.username, 'password': values.password})
         .unwrap()
         .then(() => {
             console.log('fulfilled')
+            dispatch(signedIn(true))
             navigation.navigate('Home')
         })
         .catch((error) => {

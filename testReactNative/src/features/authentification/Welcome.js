@@ -5,6 +5,7 @@ import { useLogOutMutation } from '../api/bookSlice'
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+        flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
         padding: 10,
@@ -20,10 +21,21 @@ const Welcome = ({ navigation }) => {
 
     const [logOut, { isLoading }] = useLogOutMutation() // ajouter error
 
+    function loggingOut() {
+        logOut()
+        .unwrap()
+        .then(() => {
+            alert('Log Out Okay :)')
+        })
+        .catch((error) => {
+            alert('Log Out Failed :(', error)
+        })
+    }
+
     return (
         <SafeAreaView style={styles.container}>
             <Text style={styles.textStyle}>Welcome Screen</Text>
-            <View style={{ flexDirection: 'row' }}>
+            <View >
                 <View style={{ padding: 5 }}>
                     <Button
                         title="Go to Sign-In"
@@ -40,8 +52,8 @@ const Welcome = ({ navigation }) => {
                 </View>
                 <View style={{ padding: 5 }}>
                     <Button
-                        title="Log-out"
-                        onPress={() => logOut()}
+                        title="Log-Out"
+                        onPress={() => loggingOut()}
                         color="#6495ed"
                     />
                 </View>
