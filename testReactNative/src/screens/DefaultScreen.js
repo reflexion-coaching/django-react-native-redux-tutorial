@@ -27,7 +27,6 @@ function WelcomeNavigation() {
 export default function DefaultScreen() {
 
   const isSignedIn = useSelector(selectIsSignIn);
-  //const isSignedIn = false;
 
   return (
       <SafeAreaProvider>
@@ -53,7 +52,7 @@ export default function DefaultScreen() {
               }
             })}
           >
-            {useSelector(selectIsSignIn)? (
+            {isSignedIn? (
               <>
                 <Tab.Screen name="Home" component={HomeScreen} options={{ title: 'Home' }} />
                 <Tab.Screen name="Books" component={BookListScreen} options={{ title: 'Books' }} />

@@ -427,6 +427,10 @@ Sous Mac, la commande est `brew install --cask react-native-debugger`. L'applica
 
 Ouverture d'Android > "Device Manager" > start a device
 
+### XCode 
+
+Pour visualiser l'application sur un appareil Apple (iphone, par exemple), il est nécessaire d'avoir un Mac avec XCode installé et prêt à l'emploi. 
+
 ### Ouverture de l'application 
 
 Lançons l'application avec la commande `npm start` et choisissons **Android** (si c'est le cas). 
@@ -2923,6 +2927,8 @@ export const bookApi = createApi({
 export const { useGetListOfBooksQuery, useAddNewBookMutation, useDeleteBookMutation, useUpdateBookMutation } = bookApi
 ```
 
+### Sign-Up, Sign-In et Log-Out
+
 Excellent ! Le token est stocké dans secure-store :) Attaquons-nous au problème du token écrit en claire. L'url http://127.0.0.1:8000/api/v1/dj-rest-auth/login/ renvoie le token de l'utilisateur lorsque ce dernier se connecte via mot de passe. Ajoutons cette url à la liste des endpoints de `bookSlice.js` :
 
 ```
@@ -3555,4 +3561,297 @@ export default Welcome;
 
 CQFD :) Une fois que le bouton `Log-Out` est cliqué, le token est supprimé et toutes les requêtes futures échoueront. 
 
-Il reste assez peu de features à mettre en place pour que l'application ressemble à une application réelle. Il pourrait être intéressant d'interdire l'accès aux écrans **Home** et **Books** si l'utilisateur n'est pas connecté. 
+### React Navigation : restreindre l'accès
+
+Il reste assez peu de features à mettre en place pour que l'application ressemble à une application réelle. Il pourrait être intéressant de restreindre l'accès aux écrans **Home** et **Books** si l'utilisateur n'est pas connecté. Pour ce faire, créons un nouveau reducer Redux qui ne contiendra qu'une seule variable `isSignIn` qui vaut `true` si l'utilisateur est connecté. Le reducer sera écrit dans `src/features/api/authentificationSlice.js` :
+
+```
+import { createSlice } from '@reduxjs/toolkit'
+
+const initialState = { isSignIn: false }
+
+const authentificationSlice = createSlice({
+  name: 'authentification',
+  initialState,
+  reducers: {
+    signedIn: (state, action) => {
+        state.isSignIn = action.payload
+    }
+  }
+})
+
+export const { signedIn } = authentificationSlice.actions
+
+// selecteurs
+export const selectIsSignIn = (state) => state.authentification.isSignIn;
+
+export default authentificationSlice.reducer
+```
+
+Une fois que le reducer est créé, il suffit de l'ajouter au store :
+
+```
+import { configureStore } from '@reduxjs/toolkit';
+import { bookApi } from '../features/api/bookSlice';
+import authentificationReducer from '../features/api/authentificationSlice'
+
+export const store = configureStore({
+  reducer: {
+    [bookApi.reducerPath]: bookApi.reducer,
+    authentification: authentificationReducer,
+  },
+  middleware: getDefaultMiddleware =>
+    getDefaultMiddleware().concat(bookApi.middleware)
+});
+```
+
+Parfait ! Un nouveau reducer devrait apparaître dans le debugger. Pour l'utiliser, nous devons légèrement modifier la fonction `save` dans les fichiers `SignIn.js` et `SignUp.js`. Si la récupération des tokens de l'utilisateur est un succès, la valeur de `isSignIn` devient `true`.
+
+```
+import React from 'react';
+import { Text, View, Button, StyleSheet, TextInput } from 'react-native';
+import { Formik } from 'formik';
+import * as Yup from 'yup';
+import { useRegistrationMutation } from '../api/bookSlice';
+import { useDispatch } from 'react-redux';
+import { signedIn } from '../api/authentificationSlice'
+
+...
+
+function SignIn() {
+
+    const dispatch = useDispatch();
+    const [Registration, { isLoading }] = useRegistrationMutation() 
+
+    function save(values) {
+        Registration({'username': values.username, 'email': values.email, 'password1': values.password, 'password2': values.password})
+        .unwrap()
+        .then(() => {
+            console.log('fulfilled')
+            dispatch(signedIn(true))
+        })
+        .catch((error) => {
+            console.log('oh nooooo !!! rejected', error.status, error.data, error.message)
+        })
+    }
+...
+```
+
+ainsi que le fichier `HomeScreen.js` car nous allons déplacer le bouton de *log-out* sur cet écran :
+
+```
+import { Text, Button, StyleSheet, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useLogOutMutation } from '../features/api/bookSlice';
+import { useDispatch } from 'react-redux';
+import { signedIn } from '../features/api/authentificationSlice'
+
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 10,
+    },
+    textStyle: {
+        fontSize: 36,
+        fontWeight: "bold",
+        marginBottom: 10
+    }
+});
+
+const HomeScreen = ({ navigation }) => {
+
+    const dispatch = useDispatch();
+    const [logOut, { isLoading }] = useLogOutMutation()
+
+    function loggingOut() {
+        logOut()
+            .unwrap()
+            .then(() => {
+                dispatch(signedIn(false))
+                alert('Log Out Okay :)')
+            })
+            .catch((error) => {
+                alert('Log Out Failed :(', error)
+            })
+    }
+
+    return (
+        <SafeAreaView style={styles.container}>
+            <Text style={styles.textStyle}>Home Screen</Text>
+            <Button
+                title="Go to Book List"
+                onPress={() => navigation.navigate('Books')}
+                color="#6495ed"
+            />
+            <View style={{ padding: 5 }}>
+                <Button
+                    title="Log-Out"
+                    onPress={() => loggingOut()}
+                    color="#6495ed"
+                />
+            </View>
+        </SafeAreaView>
+    );
+}
+
+export default HomeScreen;
+```
+
+Excellent ! Du coup, le fichier `Welcome.js` devient :
+
+```
+import { Text, Button, StyleSheet, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 10,
+    },
+    textStyle: {
+        fontSize: 36,
+        fontWeight: "bold",
+        marginBottom: 10
+    }
+});
+
+const Welcome = ({ navigation }) => {
+
+    return (
+        <SafeAreaView style={styles.container}>
+            <Text style={styles.textStyle}>Welcome Screen</Text>
+            <View >
+                <View style={{ padding: 5 }}>
+                    <Button
+                        title="Go to Sign-In"
+                        onPress={() => navigation.navigate('Sign-In')}
+                        color="#6495ed"
+                    />
+                </View>
+                <View style={{ padding: 5 }}>
+                    <Button
+                        title="Go to Sign-Up"
+                        onPress={() => navigation.navigate('Sign-Up')}
+                        color="#6495ed"
+                    />
+                </View>
+            </View>
+        </SafeAreaView>
+    );
+}
+
+export default Welcome;
+```
+
+Plus besoin de mettre un bouton de déconnexion sur cet écran car l'utilisateur ne le verra pas s'il n'est pas connecté. Bien ! Maintenant, créons un fichier `src/screens/DefaultScreen.js` dans lequel nous allons recopier la logique du fichier `App.js` :
+
+```
+import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import BookListScreen from './BookListScreen';
+import HomeScreen from './HomeScreen'
+import SignInScreen from './SignInScreen';
+import SignUpScreen from './SignUpScreen';
+import WelcomeScreen from './WelcomeScreen'
+import Ionicons from '@expo/vector-icons/Ionicons'
+import { useSelector } from 'react-redux';
+import { selectIsSignIn } from '../features/api/authentificationSlice';
+
+const Tab = createBottomTabNavigator();
+const Stack = createNativeStackNavigator();
+
+function WelcomeNavigation() {
+  return (
+    <Stack.Navigator>
+      <Stack.Screen name="Welcome" component={WelcomeScreen} />
+      <Stack.Screen name="Sign-In" component={SignInScreen} options={{ title: 'Sign In' }} />
+      <Stack.Screen name="Sign-Up" component={SignUpScreen} options={{ title: 'Sign Up' }} />
+    </Stack.Navigator>
+  );
+}
+
+export default function DefaultScreen() {
+
+  const isSignedIn = useSelector(selectIsSignIn);
+
+  return (
+      <SafeAreaProvider>
+        <NavigationContainer>
+          <Tab.Navigator
+            screenOptions={({ route }) => ({
+              tabBarIcon: ({ focused, color, size }) => {
+                let iconName;
+                if (route.name === 'Home') {
+                  iconName = focused
+                    ? 'home'
+                    : 'home-outline';
+                } else if (route.name === 'Books') {
+                  iconName = focused
+                    ? 'book'
+                    : 'book-outline';
+                } else if (route.name === 'Welcome Nav') {
+                  iconName = focused
+                    ? 'log-in'
+                    : 'log-in-outline';
+                }
+                return <Ionicons name={iconName} size={size} color={color} />;
+              }
+            })}
+          >
+            {isSignedIn? (
+              <>
+                <Tab.Screen name="Home" component={HomeScreen} options={{ title: 'Home' }} />
+                <Tab.Screen name="Books" component={BookListScreen} options={{ title: 'Books' }} />
+              </>
+            ) : (
+              <Tab.Screen name="Welcome Nav" component={WelcomeNavigation} options={{ title: 'Welcome', headerShown: false }} />
+            )}
+          </Tab.Navigator>
+        </NavigationContainer>
+      </SafeAreaProvider>
+  );
+}
+```
+
+La seule différence est la présence de `isSignedIn` qui autorise l'accès aux écrans `Home` et `Books` si la valeur de `isSignedIn` est `true`. Enfin, il ne reste plus qu'à simplifier `App.js` :
+
+```
+import React from 'react';
+import { Provider } from 'react-redux';
+import { store } from './src/reducers/store';
+import DefaultScreen from './src/screens/DefaultScreen';
+
+
+export default function App() {
+
+  return (
+    <Provider store={store}>
+      <DefaultScreen />
+    </Provider>
+  );
+}
+```
+
+CQFD :D L'application fonctionne à merveille ! Les dernières manipulations sont un peu laborieuses car nous devons modifier beaucoup de fichiers mais aucune notion n'est difficile. Il suffit de créer un state global dans Redux qui contient un booléen permettant d'accéder ou non à une boucle `if` avec un opérateur ternaire. 
+
+Et voilà ! Je pense que nous pouvons nous arrêter là pour le moment. C'est du bon boulot :)
+
+## Améliorations
+
+Une liste des améliorations éventuelles est disponible ci-dessous :
+
+* **React Native Paper** pour améliorer l'aspect de l'application
+
+* Récupérer l'**ID** des utilisateurs et l'injecter dans les requêtes POST de création / modification de livres
+
+* Ajouter plus de contrôle aux permissions d'accès sur Django Rest Framework
+
+* ...

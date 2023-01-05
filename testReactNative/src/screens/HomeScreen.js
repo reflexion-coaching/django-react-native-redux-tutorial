@@ -22,7 +22,7 @@ const styles = StyleSheet.create({
 const HomeScreen = ({ navigation }) => {
 
     const dispatch = useDispatch();
-    const [logOut, { isLoading }] = useLogOutMutation() // ajouter error
+    const [logOut, { isLoading }] = useLogOutMutation()
 
     function loggingOut() {
         logOut()

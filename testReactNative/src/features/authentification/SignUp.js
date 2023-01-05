@@ -1,7 +1,6 @@
 import { Text, View, Button, StyleSheet, TextInput } from 'react-native';
 import { Formik } from 'formik';
 import * as Yup from 'yup';
-import { useNavigation } from '@react-navigation/native';
 import { useLogInMutation } from '../api/bookSlice'
 import { useDispatch } from 'react-redux';
 import { signedIn } from '../api/authentificationSlice'
@@ -32,11 +31,10 @@ const styles = StyleSheet.create({
 
 function SignUp() {
 
-    const navigation = useNavigation();
     const dispatch = useDispatch();
     const [logIn, { isLoading }] = useLogInMutation() // ajouter error
 
-    function save(values, navigation) {
+    function save(values) {
         logIn({'username': values.username, 'password': values.password})
         .unwrap()
         .then(() => {
@@ -54,7 +52,7 @@ function SignUp() {
                 email: "pierre@email.com",
                 password: "password"
             }}
-            onSubmit={values => save(values, navigation)}
+            onSubmit={values => save(values)}
             validationSchema={Yup.object({
                 username: Yup
                     .string()
