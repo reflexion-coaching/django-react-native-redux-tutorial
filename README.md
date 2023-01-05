@@ -3864,4 +3864,6 @@ Une liste des améliorations éventuelles est disponible ci-dessous :
 
 * Ajouter plus de contrôle aux permissions d'accès sur Django Rest Framework
 
+* Mise en place des tokens **CSFR** 
+
 * ...
