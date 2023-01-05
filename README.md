@@ -1,12 +1,22 @@
 # Tutoriel : Django-API, Redux-ToolKit Query et React Native
 
-**En cours !**
-
 Ce tutoriel illustre les principales interactions entre une base de données et une application.
 
-La base de données est une base SQLite simple créée et reliée à l'application via le framework Django REST. L'application est écrite avec React Native.
+La base de données est une base SQLite créée et reliée à l'application via le framework Django REST. L'application est écrite avec React Native.
 
 La mise en place de l'API est fortement inspirée (pour ne pas dire copiée-collée) de l'excellent livre **Django for API** de William S. Vincent. Ouvrage que je recommande vivement !
+
+## Pré-requis
+
+Les langages informatiques utilisés sont **python** et **React** (JavaScript). Il me semble nécessaire d'avoir quelques bases de programmation avec ces deux langages pour suivre correctement ce tutoriel. 
+
+Afin de reproduire les exemples, il est impératif d'installer **python** et **npm** (ou **yarn**) et de pouvoir les utiliser en ligne de commande :
+
+```
+$ python --help
+
+$ npm --help
+```
 
 ## API et base de données
 
